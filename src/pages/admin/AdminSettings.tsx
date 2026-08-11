@@ -1,53 +1,137 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { trpc } from "@/providers/trpc";
-import { Save, Check, CreditCard, Mail, Globe } from "lucide-react";
+import { Save, Check, CreditCard, Mail, Globe, Truck, Copy } from "lucide-react";
+import { Paths, Shipping } from "@contracts/constants";
+
+type FieldProps = {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+  placeholder?: string;
+};
+
+/**
+ * Field et SectionHeader sont declares au niveau module : les redefinir dans
+ * le corps du composant remonterait les inputs a chaque frappe (perte de focus).
+ */
+function Field({ label, value, onChange, type = "text", placeholder }: FieldProps) {
+  return (
+    <div className="flex items-start gap-4">
+      <div className="flex-1">
+        <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1.5">{label}</label>
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222]"
+        />
+      </div>
+    </div>
+  );
+}
+
+function SectionHeader({
+  icon: Icon,
+  title,
+  badge,
+}: {
+  icon: typeof Globe;
+  title: string;
+  badge?: { label: string; ok: boolean };
+}) {
+  return (
+    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-[#f0f0f0]">
+      <Icon size={16} className="text-[#999999]" />
+      <h2 className="text-[0.875rem] font-medium">{title}</h2>
+      {badge && (
+        <span
+          className={`ml-auto text-[0.5625rem] uppercase tracking-[1px] px-2 py-0.5 ${
+            badge.ok ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"
+          }`}
+        >
+          {badge.label}
+        </span>
+      )}
+    </div>
+  );
+}
+
+const EMPTY_FORM = {
+  site_name: "DN MODE",
+  site_description: "",
+  contact_email: "",
+  shipping_threshold: String(Shipping.freeThreshold),
+  shipping_cost: "5.90",
+  currency: "EUR",
+  instagram_url: "",
+  // Stripe
+  stripe_publishable_key: "",
+  stripe_secret_key: "",
+  // Gmail OAuth
+  gmail_client_id: "",
+  gmail_client_secret: "",
+  // Sendcloud
+  sendcloud_public_key: "",
+  sendcloud_secret_key: "",
+  sendcloud_sender_address_id: "",
+  sendcloud_default_weight: "1",
+  // Emails
+  resend_api_key: "",
+  from_email: "",
+  support_email: "",
+};
+
+type ConfigRow = { key: string; value: string | null };
+
+/** Valeurs initiales du formulaire, calculees une seule fois au montage. */
+function initialForm(configs: ConfigRow[]): typeof EMPTY_FORM {
+  const cm: Record<string, string> = {};
+  configs.forEach((c) => { cm[c.key] = c.value || ""; });
+  const next = { ...EMPTY_FORM };
+  (Object.keys(EMPTY_FORM) as Array<keyof typeof EMPTY_FORM>).forEach((key) => {
+    if (cm[key]) next[key] = cm[key];
+  });
+  return next;
+}
 
 export default function AdminSettings() {
-  const utils = trpc.useUtils();
   const { data: configs, isLoading } = trpc.config.list.useQuery();
+
+  if (isLoading || !configs) {
+    return (
+      <div>
+        <h1 className="text-2xl font-light text-[#222222] mb-6">Parametres</h1>
+        <div className="flex items-center justify-center h-[200px]">
+          <div className="w-6 h-6 border-2 border-[#222222] border-t-transparent animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  // Le formulaire n'est monte qu'une fois la config chargee : son etat initial
+  // vient des props, sans effet de synchronisation.
+  return <SettingsForm configs={configs} />;
+}
+
+function SettingsForm({ configs }: { configs: ConfigRow[] }) {
+  const utils = trpc.useUtils();
   const setConfig = trpc.config.set.useMutation({ onSuccess: () => utils.config.list.invalidate() });
   const [saved, setSaved] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  const configMap: Record<string, string> = {};
-  configs?.forEach((c) => { configMap[c.key] = c.value || ""; });
-
-  const [form, setForm] = useState({
-    site_name: configMap["site_name"] || "DN MODE",
-    site_description: configMap["site_description"] || "",
-    contact_email: configMap["contact_email"] || "",
-    shipping_threshold: configMap["shipping_threshold"] || "120",
-    shipping_cost: configMap["shipping_cost"] || "5.90",
-    currency: configMap["currency"] || "EUR",
-    instagram_url: configMap["instagram_url"] || "",
-    // Stripe
-    stripe_publishable_key: configMap["stripe_publishable_key"] || "",
-    stripe_secret_key: configMap["stripe_secret_key"] || "",
-    // Gmail OAuth
-    gmail_client_id: configMap["gmail_client_id"] || "",
-    gmail_client_secret: configMap["gmail_client_secret"] || "",
+  const { data: sendcloudStatus } = trpc.sendcloud.status.useQuery(undefined, { retry: false });
+  const testSendcloud = trpc.sendcloud.testConnection.useMutation({
+    onSuccess: () => utils.sendcloud.status.invalidate(),
   });
 
-  // Update form when configs load
-  useEffect(() => {
-    if (configs) {
-      const cm: Record<string, string> = {};
-      configs.forEach((c) => { cm[c.key] = c.value || ""; });
-      setForm(prev => ({
-        ...prev,
-        site_name: cm["site_name"] || prev.site_name,
-        site_description: cm["site_description"] || prev.site_description,
-        contact_email: cm["contact_email"] || prev.contact_email,
-        shipping_threshold: cm["shipping_threshold"] || prev.shipping_threshold,
-        shipping_cost: cm["shipping_cost"] || prev.shipping_cost,
-        currency: cm["currency"] || prev.currency,
-        instagram_url: cm["instagram_url"] || prev.instagram_url,
-        stripe_publishable_key: cm["stripe_publishable_key"] || prev.stripe_publishable_key,
-        stripe_secret_key: cm["stripe_secret_key"] || prev.stripe_secret_key,
-        gmail_client_id: cm["gmail_client_id"] || prev.gmail_client_id,
-        gmail_client_secret: cm["gmail_client_secret"] || prev.gmail_client_secret,
-      }));
-    }
-  }, [configs]);
+  const { data: emailStatus } = trpc.email.status.useQuery(undefined, { retry: false });
+  const seedTemplates = trpc.email.seedDefaults.useMutation({
+    onSuccess: () => utils.email.listTemplates.invalidate(),
+  });
+
+  const [form, setForm] = useState(() => initialForm(configs));
 
   const handleSave = (key: string, value: string) => {
     setConfig.mutate({ key, value }, {
@@ -66,29 +150,8 @@ export default function AdminSettings() {
     setTimeout(() => setSaved(null), 1500);
   };
 
-  const SectionHeader = ({ icon: Icon, title }: { icon: any; title: string }) => (
-    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-[#f0f0f0]">
-      <Icon size={16} className="text-[#999999]" />
-      <h2 className="text-[0.875rem] font-medium">{title}</h2>
-    </div>
-  );
-
-  const Field = ({ label, value, onChange, type = "text", placeholder }: {
-    label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string;
-  }) => (
-    <div className="flex items-start gap-4">
-      <div className="flex-1">
-        <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1.5">{label}</label>
-        <input
-          type={type}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222]"
-        />
-      </div>
-    </div>
-  );
+  const redirectUri =
+    typeof window !== "undefined" ? `${window.location.origin}${Paths.googleAuthCallback}` : "";
 
   return (
     <div>
@@ -104,12 +167,7 @@ export default function AdminSettings() {
         </button>
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center h-[200px]">
-          <div className="w-6 h-6 border-2 border-[#222222] border-t-transparent animate-spin" />
-        </div>
-      ) : (
-        <div className="space-y-8">
+      <div className="space-y-8">
           {/* Site Settings */}
           <div className="bg-white shadow-sm border border-[#e8e8e8] p-6">
             <SectionHeader icon={Globe} title="Site Web" />
@@ -119,10 +177,13 @@ export default function AdminSettings() {
               <Field label="Email de contact" value={form.contact_email} onChange={(v) => setForm({ ...form, contact_email: v })} placeholder="contact@dnmode.fr" />
               <Field label="URL Instagram" value={form.instagram_url} onChange={(v) => setForm({ ...form, instagram_url: v })} placeholder="https://instagram.com/..." />
               <div className="grid grid-cols-3 gap-4">
-                <Field label="Seuil livraison offerte" value={form.shipping_threshold} onChange={(v) => setForm({ ...form, shipping_threshold: v })} placeholder="120" />
+                <Field label="Seuil livraison offerte (€)" value={form.shipping_threshold} onChange={(v) => setForm({ ...form, shipping_threshold: v })} placeholder="100" />
                 <Field label="Frais de livraison" value={form.shipping_cost} onChange={(v) => setForm({ ...form, shipping_cost: v })} placeholder="5.90" />
                 <Field label="Devise" value={form.currency} onChange={(v) => setForm({ ...form, currency: v })} placeholder="EUR" />
               </div>
+              <p className="text-[0.6875rem] text-[#999999]">
+                Livraison offerte a partir de {form.shipping_threshold || Shipping.freeThreshold}€ en {Shipping.zone}.
+              </p>
             </div>
           </div>
 
@@ -146,6 +207,90 @@ export default function AdminSettings() {
             </div>
           </div>
 
+          {/* Sendcloud Settings */}
+          <div className="bg-white shadow-sm border border-[#e8e8e8] p-6">
+            <SectionHeader
+              icon={Truck}
+              title="Livraison Sendcloud"
+              badge={{
+                label: sendcloudStatus?.configured ? "Connecte" : "Mode demo",
+                ok: Boolean(sendcloudStatus?.configured),
+              }}
+            />
+            <div className="space-y-4">
+              <Field label="Sendcloud Public Key" value={form.sendcloud_public_key} onChange={(v) => setForm({ ...form, sendcloud_public_key: v })} placeholder="Cle publique API" />
+              <Field label="Sendcloud Secret Key" value={form.sendcloud_secret_key} onChange={(v) => setForm({ ...form, sendcloud_secret_key: v })} type="password" placeholder="Cle secrete API" />
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="ID adresse d'expedition" value={form.sendcloud_sender_address_id} onChange={(v) => setForm({ ...form, sendcloud_sender_address_id: v })} placeholder="123456" />
+                <Field label="Poids par defaut (kg)" value={form.sendcloud_default_weight} onChange={(v) => setForm({ ...form, sendcloud_default_weight: v })} placeholder="1" />
+              </div>
+              <div className="flex gap-2 flex-wrap items-center">
+                <button onClick={() => handleSave("sendcloud_public_key", form.sendcloud_public_key)} className="text-[0.625rem] uppercase tracking-[1px] border border-[#e0e0e0] px-3 py-1.5 hover:border-[#222222]">
+                  {saved === "sendcloud_public_key" ? "OK" : "Enregistrer cle publique"}
+                </button>
+                <button onClick={() => handleSave("sendcloud_secret_key", form.sendcloud_secret_key)} className="text-[0.625rem] uppercase tracking-[1px] border border-[#e0e0e0] px-3 py-1.5 hover:border-[#222222]">
+                  {saved === "sendcloud_secret_key" ? "OK" : "Enregistrer cle secrete"}
+                </button>
+                <button
+                  onClick={() => testSendcloud.mutate()}
+                  disabled={testSendcloud.isPending}
+                  className="text-[0.625rem] uppercase tracking-[1px] bg-[#222222] text-white px-3 py-1.5 hover:bg-[#333333] disabled:opacity-50"
+                >
+                  {testSendcloud.isPending ? "Test..." : "Tester la connexion"}
+                </button>
+              </div>
+              {testSendcloud.data && (
+                <p className={`text-[0.6875rem] ${testSendcloud.data.ok ? "text-green-700" : "text-red-600"}`}>
+                  {testSendcloud.data.message}
+                </p>
+              )}
+              <p className="text-[0.6875rem] text-[#999999]">
+                Colissimo, Chronopost et Mondial Relay passent par Sendcloud. Sans cles, la boutique
+                fonctionne en mode demo (methodes et points relais fictifs).
+              </p>
+            </div>
+          </div>
+
+          {/* Emails transactionnels */}
+          <div className="bg-white shadow-sm border border-[#e8e8e8] p-6">
+            <SectionHeader
+              icon={Mail}
+              title="Emails transactionnels"
+              badge={{
+                label: emailStatus?.provider === "resend" ? "Resend" : "Mode demo",
+                ok: emailStatus?.provider === "resend",
+              }}
+            />
+            <div className="space-y-4">
+              <Field label="Resend API Key" value={form.resend_api_key} onChange={(v) => setForm({ ...form, resend_api_key: v })} type="password" placeholder="re_..." />
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Email expediteur" value={form.from_email} onChange={(v) => setForm({ ...form, from_email: v })} placeholder="DN MODE <contact@dnmode.fr>" />
+                <Field label="Email SAV" value={form.support_email} onChange={(v) => setForm({ ...form, support_email: v })} placeholder="sav@dnmode.fr" />
+              </div>
+              <div className="flex gap-2 flex-wrap items-center">
+                <button onClick={() => handleSave("resend_api_key", form.resend_api_key)} className="text-[0.625rem] uppercase tracking-[1px] border border-[#e0e0e0] px-3 py-1.5 hover:border-[#222222]">
+                  {saved === "resend_api_key" ? "OK" : "Enregistrer la cle"}
+                </button>
+                <button
+                  onClick={() => seedTemplates.mutate()}
+                  disabled={seedTemplates.isPending}
+                  className="text-[0.625rem] uppercase tracking-[1px] bg-[#222222] text-white px-3 py-1.5 hover:bg-[#333333] disabled:opacity-50"
+                >
+                  {seedTemplates.isPending ? "Creation..." : "Creer les templates par defaut"}
+                </button>
+                {seedTemplates.data && (
+                  <span className="text-[0.6875rem] text-green-700">
+                    {seedTemplates.data.created} template(s) crees ({seedTemplates.data.total} au total)
+                  </span>
+                )}
+              </div>
+              <p className="text-[0.6875rem] text-[#999999]">
+                Confirmation de commande, expedition et reponses SAV. Sans cle Resend, les emails sont
+                journalises sans etre envoyes.
+              </p>
+            </div>
+          </div>
+
           {/* Gmail OAuth Settings */}
           <div className="bg-white shadow-sm border border-[#e8e8e8] p-6">
             <SectionHeader icon={Mail} title="Connexion Gmail (Google OAuth)" />
@@ -162,17 +307,30 @@ export default function AdminSettings() {
               </div>
               <div className="bg-[#f4f4f4] p-3 text-[0.6875rem] text-[#666666]">
                 <p className="font-medium mb-1">URL de redirection autorisee :</p>
-                <code className="text-[0.625rem] bg-white px-2 py-1 border border-[#e0e0e0]">
-                  {typeof window !== "undefined" ? window.location.origin : ""}/api/oauth/callback
-                </code>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <code className="text-[0.625rem] bg-white px-2 py-1 border border-[#e0e0e0] break-all">
+                    {redirectUri}
+                  </code>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard?.writeText(redirectUri);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 1500);
+                    }}
+                    className="flex items-center gap-1 text-[0.625rem] uppercase tracking-[1px] border border-[#e0e0e0] px-2 py-1 hover:border-[#222222] bg-white"
+                  >
+                    {copied ? <Check size={11} /> : <Copy size={11} />}
+                    {copied ? "Copie" : "Copier"}
+                  </button>
+                </div>
                 <p className="mt-2 text-[#999999]">
-                  Configurez cette URL dans votre console Google Cloud.
+                  Declarez exactement cette URI dans votre console Google Cloud (Identifiants &gt; ID
+                  client OAuth &gt; URI de redirection autorises).
                 </p>
               </div>
-            </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

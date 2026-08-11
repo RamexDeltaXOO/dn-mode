@@ -60,3 +60,18 @@
     @apply text-[0.75rem] uppercase tracking-[2px];
   }
 }
+
+/* Bandeau defilant : on respecte le reglage systeme "animations reduites"
+   en figeant le defilement et en recentrant le message. */
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none !important;
+    transform: none !important;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .marquee-track > [aria-hidden="true"] {
+    display: none;
+  }
+}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import { Menu, Search, ShoppingBag, User } from "lucide-react";
+import { Shipping, freeShippingBanner } from "@contracts/constants";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
 
@@ -8,6 +9,24 @@ interface HeaderProps {
   onCartOpen: () => void;
   onSearchOpen: () => void;
   onNavOpen: () => void;
+}
+
+const SECONDARY_MESSAGES = ["Paiement securise", "Retours sous 14 jours"];
+
+/** Une sequence complete du bandeau, dupliquee pour une boucle sans couture. */
+function MarqueeSequence({ messages }: { messages: string[] }) {
+  return (
+    <>
+      {messages.map((message, index) => (
+        <span key={`${message}-${index}`} className="flex items-center shrink-0">
+          <span className="px-6">{message}</span>
+          <span aria-hidden="true" className="opacity-40">
+            •
+          </span>
+        </span>
+      ))}
+    </>
+  );
 }
 
 export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderProps) {
@@ -19,6 +38,15 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
 
   const { data: cartData } = trpc.cart.get.useQuery();
   const cartCount = cartData?.items?.length || 0;
+
+  // Seuil de livraison offerte pilote depuis le CRM (100€ par defaut).
+  const { data: shippingSettings } = trpc.shipping.settings.useQuery(undefined, {
+    staleTime: 1000 * 60 * 5,
+    retry: false,
+  });
+  const banner = shippingSettings?.banner ?? freeShippingBanner();
+  const threshold = shippingSettings?.threshold ?? Shipping.freeThreshold;
+  const marqueeMessages = [banner, ...SECONDARY_MESSAGES];
 
   useEffect(() => {
     const handleScroll = () => {
@@ -33,10 +61,17 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
 
   return (
     <>
-      {/* Top bar */}
-      <div className="bg-[#121212] text-white text-[0.625rem] tracking-[1.5px] uppercase py-2 px-4 text-center z-[110] relative">
-        <span className="hidden sm:inline">Livraison offerte a partir de 120€ — En France metropolitaine **</span>
-        <span className="sm:hidden">Livraison offerte des 120€</span>
+      {/* Top bar — statique sur desktop, defilante sur mobile */}
+      <div className="bg-[#121212] text-white text-[0.625rem] tracking-[1.5px] uppercase py-2 z-[110] relative overflow-hidden">
+        <span className="hidden sm:block px-4 text-center">{banner}</span>
+        <div className="sm:hidden overflow-hidden">
+          <div className="marquee-track flex w-max whitespace-nowrap animate-marquee">
+            <MarqueeSequence messages={marqueeMessages} />
+            <span aria-hidden="true" className="flex">
+              <MarqueeSequence messages={marqueeMessages} />
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Main header */}
@@ -52,11 +87,14 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
           </button>
 
           {/* Center: Logo */}
-          <Link
-            to="/"
-            className="absolute left-1/2 -translate-x-1/2 font-['Playfair_Display'] text-xl sm:text-[1.4rem] tracking-[-0.5px] text-[#222222]"
-          >
-            dn mode
+          <Link to="/" className="absolute left-1/2 -translate-x-1/2" aria-label="DN MODE">
+            <img
+              src="/logo-dnmode.png"
+              alt="DN MODE"
+              className={`h-6 sm:h-7 w-auto transition-[filter] duration-300 ${
+                scrolled ? "" : "drop-shadow-[0_1px_8px_rgba(255,255,255,0.55)]"
+              }`}
+            />
           </Link>
 
           {/* Right: Icons */}
@@ -95,6 +133,9 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
           </div>
         </div>
       </header>
+
+      {/* Valeur du seuil exposee aux lecteurs d'ecran uniquement */}
+      <span className="sr-only">Livraison offerte a partir de {threshold} euros en {Shipping.zone}</span>
     </>
   );
 }

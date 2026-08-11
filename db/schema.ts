@@ -18,6 +18,8 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   avatar: text("avatar"),
   passwordHash: varchar("password_hash", { length: 255 }),
+  googleId: varchar("google_id", { length: 255 }),
+  provider: varchar("provider", { length: 50 }).default("local"),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
@@ -128,6 +130,17 @@ export const orders = mysqlTable("orders", {
   status: mysqlEnum("status", ["pending", "processing", "shipped", "delivered", "cancelled"])
     .default("pending"),
   notes: text("notes"),
+  // ── Livraison / Sendcloud ────────────────────────────────
+  shippingMethodId: int("shipping_method_id"),
+  shippingCarrier: varchar("shipping_carrier", { length: 100 }),
+  shippingMethodName: varchar("shipping_method_name", { length: 255 }),
+  servicePointId: varchar("service_point_id", { length: 100 }),
+  servicePointName: varchar("service_point_name", { length: 255 }),
+  servicePointAddress: varchar("service_point_address", { length: 500 }),
+  sendcloudParcelId: varchar("sendcloud_parcel_id", { length: 100 }),
+  trackingNumber: varchar("tracking_number", { length: 100 }),
+  trackingUrl: varchar("tracking_url", { length: 500 }),
+  labelUrl: varchar("label_url", { length: 500 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
     .defaultNow()
@@ -157,8 +170,12 @@ export const contacts = mysqlTable("contacts", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull(),
+  subject: varchar("subject", { length: 255 }),
+  orderNumber: varchar("order_number", { length: 50 }),
   message: text("message").notNull(),
   status: mysqlEnum("status", ["new", "read", "replied"]).default("new"),
+  adminReply: text("admin_reply"),
+  repliedAt: timestamp("replied_at"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -236,6 +253,8 @@ export const emailTemplates = mysqlTable("email_templates", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export type EmailTemplate = typeof emailTemplates.$inferSelect;
+
 // ── Campaigns ───────────────────────────────────────────────
 export const campaigns = mysqlTable("campaigns", {
   id: int("id").autoincrement().primaryKey(),
@@ -264,5 +283,13 @@ export const shippingMethods = mysqlTable("shipping_methods", {
   isActive: boolean("is_active").default(true),
   config: json("config").$type<Record<string, unknown>>(),
   sortOrder: int("sort_order").default(0),
+  // ── Sendcloud ────────────────────────────────────────────
+  sendcloudMethodId: int("sendcloud_method_id"),
+  requiresServicePoint: boolean("requires_service_point").default(false),
+  minWeight: decimal("min_weight", { precision: 10, scale: 3 }),
+  maxWeight: decimal("max_weight", { precision: 10, scale: 3 }),
+  countries: json("countries").$type<string[]>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export type ShippingMethod = typeof shippingMethods.$inferSelect;

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router";
+import { Shipping } from "@contracts/constants";
 import { trpc } from "@/providers/trpc";
 import { ChevronLeft, ShoppingBag, Check } from "lucide-react";
 
@@ -14,6 +15,13 @@ export default function ProductPage() {
     { slug: slug || "" },
     { enabled: !!slug }
   );
+
+  // Seuil de livraison offerte pilote depuis le CRM (100€ par defaut).
+  const { data: shippingSettings } = trpc.shipping.settings.useQuery(undefined, {
+    staleTime: 1000 * 60 * 5,
+    retry: false,
+  });
+  const freeShippingThreshold = shippingSettings?.threshold ?? Shipping.freeThreshold;
 
   // Set main image when product loads
   if (product && product.images && mainImage === "") {
@@ -184,7 +192,9 @@ export default function ProductPage() {
 
             <div className="mt-4 space-y-1">
               <p className="text-[0.75rem] text-[#666666]">Expedition sous 2-3 jours ouvres</p>
-              <p className="text-[0.75rem] text-[#666666]">Livraison offerte a partir de 120€</p>
+              <p className="text-[0.75rem] text-[#666666]">
+                Livraison offerte a partir de {freeShippingThreshold}€ — En {Shipping.zone}
+              </p>
             </div>
 
             {product.description && (

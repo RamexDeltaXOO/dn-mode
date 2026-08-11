@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { trpc } from "@/providers/trpc";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Package, MapPin, ExternalLink, FileDown } from "lucide-react";
+import { carrierLabel } from "@contracts/constants";
 
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -18,7 +19,9 @@ const statusLabels: Record<string, string> = {
   cancelled: "Annule",
 };
 
-const statusOptions = ["pending", "processing", "shipped", "delivered", "cancelled"];
+type OrderStatus = "pending" | "processing" | "shipped" | "delivered" | "cancelled";
+
+const statusOptions: OrderStatus[] = ["pending", "processing", "shipped", "delivered", "cancelled"];
 
 export default function AdminOrders() {
   const [statusFilter, setStatusFilter] = useState("");
@@ -30,6 +33,13 @@ export default function AdminOrders() {
   const utils = trpc.useUtils();
   const updateStatus = trpc.order.updateStatus.useMutation({
     onSuccess: () => utils.order.list.invalidate(),
+  });
+
+  const createLabel = trpc.sendcloud.createLabel.useMutation({
+    onSuccess: () => {
+      utils.order.list.invalidate();
+      utils.order.getById.invalidate();
+    },
   });
 
   const { data: orderDetail } = trpc.order.getById.useQuery(
@@ -81,9 +91,8 @@ export default function AdminOrders() {
               </tr>
             ) : (
               orders.map((order) => (
-                <>
+                <Fragment key={order.id}>
                   <tr
-                    key={order.id}
                     className="border-b border-[#f8f8f8] hover:bg-[#fafafa] cursor-pointer"
                     onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
                   >
@@ -100,9 +109,10 @@ export default function AdminOrders() {
                     <td className="px-4 py-3">
                       <select
                         value={order.status || ""}
+                        onClick={(e) => e.stopPropagation()}
                         onChange={(e) => {
                           e.stopPropagation();
-                          updateStatus.mutate({ id: order.id, status: e.target.value as any });
+                          updateStatus.mutate({ id: order.id, status: e.target.value as OrderStatus });
                         }}
                         className={`text-[0.625rem] uppercase tracking-[1px] px-2 py-1 border-0 cursor-pointer ${statusColors[order.status || ""]}`}
                       >
@@ -124,7 +134,7 @@ export default function AdminOrders() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
                             <h4 className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] mb-2">Articles</h4>
-                            {orderDetail.items?.map((item: any) => (
+                            {orderDetail.items?.map((item) => (
                               <div key={item.id} className="flex justify-between py-1 text-[0.75rem]">
                                 <span>{item.productName} x{item.quantity}</span>
                                 <span>€{parseFloat(item.totalPrice as string).toFixed(2)}</span>
@@ -145,12 +155,85 @@ export default function AdminOrders() {
                             {orderDetail.phone && (
                               <p className="text-[0.75rem] text-[#666666] mt-1">{orderDetail.phone}</p>
                             )}
+
+                            {orderDetail.shippingCarrier && (
+                              <p className="text-[0.75rem] text-[#666666] mt-2 flex items-center gap-1">
+                                <Package size={12} className="text-[#999999]" />
+                                {carrierLabel(orderDetail.shippingCarrier)}
+                                {orderDetail.shippingMethodName ? ` — ${orderDetail.shippingMethodName}` : ""}
+                              </p>
+                            )}
+
+                            {orderDetail.servicePointName && (
+                              <p className="text-[0.75rem] text-[#666666] mt-1 flex items-start gap-1">
+                                <MapPin size={12} className="text-[#999999] mt-0.5 flex-shrink-0" />
+                                <span>
+                                  {orderDetail.servicePointName}
+                                  <br />
+                                  <span className="text-[#999999]">{orderDetail.servicePointAddress}</span>
+                                </span>
+                              </p>
+                            )}
+
+                            {orderDetail.trackingNumber && (
+                              <p className="text-[0.75rem] mt-2">
+                                <span className="text-[#999999]">Suivi : </span>
+                                {orderDetail.trackingUrl ? (
+                                  <a
+                                    href={orderDetail.trackingUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[#222222] underline inline-flex items-center gap-1"
+                                  >
+                                    {orderDetail.trackingNumber}
+                                    <ExternalLink size={11} />
+                                  </a>
+                                ) : (
+                                  <span className="text-[#222222]">{orderDetail.trackingNumber}</span>
+                                )}
+                              </p>
+                            )}
+
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <button
+                                onClick={() => createLabel.mutate({ orderId: orderDetail.id })}
+                                disabled={createLabel.isPending || !!orderDetail.sendcloudParcelId}
+                                className="text-[0.625rem] uppercase tracking-[1px] bg-[#222222] text-white px-3 py-1.5 hover:bg-[#333333] disabled:opacity-40"
+                              >
+                                {orderDetail.sendcloudParcelId
+                                  ? "Etiquette deja generee"
+                                  : createLabel.isPending
+                                    ? "Creation..."
+                                    : "Creer l'etiquette Sendcloud"}
+                              </button>
+                              {orderDetail.labelUrl && (
+                                <a
+                                  href={orderDetail.labelUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 text-[0.625rem] uppercase tracking-[1px] border border-[#e0e0e0] px-3 py-1.5 hover:border-[#222222]"
+                                >
+                                  <FileDown size={11} />
+                                  Telecharger l&apos;etiquette
+                                </a>
+                              )}
+                            </div>
+
+                            {createLabel.data && (
+                              <p
+                                className={`text-[0.6875rem] mt-2 ${
+                                  createLabel.data.ok ? "text-green-700" : "text-red-600"
+                                }`}
+                              >
+                                {createLabel.data.message}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))
             )}
           </tbody>

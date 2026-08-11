@@ -2,14 +2,21 @@ import { useState, useMemo } from "react";
 import { Link } from "react-router";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { carrierLabel } from "@contracts/constants";
 import { trpc } from "@/providers/trpc";
 import { ChevronLeft, Check, ShoppingBag } from "lucide-react";
+import ShippingMethodSelector from "@/components/ShippingMethodSelector";
+import type { ShippingMethodOption } from "@/components/ShippingMethodSelector";
+import ServicePointPicker from "@/components/ServicePointPicker";
+import type { SelectedServicePoint } from "@/components/ServicePointPicker";
 
-function CheckoutForm({ clientSecret, orderId, orderNumber, total }: {
+function CheckoutForm({ clientSecret, orderId, orderNumber, total, carrierName, servicePoint }: {
   clientSecret: string;
   orderId: number;
   orderNumber: string;
   total: number;
+  carrierName: string | null;
+  servicePoint: SelectedServicePoint | null;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -64,7 +71,15 @@ function CheckoutForm({ clientSecret, orderId, orderNumber, total }: {
         </div>
         <h2 className="text-2xl font-light text-[#222222] mb-2">Paiement reussi !</h2>
         <p className="text-[0.9375rem] text-[#666666] mb-1">Commande {orderNumber}</p>
-        <p className="text-[0.8125rem] text-[#999999] mb-6">Un email de confirmation a ete envoye.</p>
+        {carrierName && (
+          <p className="text-[0.8125rem] text-[#666666]">Livraison : {carrierName}</p>
+        )}
+        {servicePoint && (
+          <p className="text-[0.8125rem] text-[#666666]">
+            Point relais : {servicePoint.name} — {servicePoint.address}
+          </p>
+        )}
+        <p className="text-[0.8125rem] text-[#999999] mt-2 mb-6">Un email de confirmation a ete envoye.</p>
         <Link
           to="/"
           className="inline-block bg-[#222222] text-white px-8 py-3 text-[0.75rem] uppercase tracking-[2px] hover:bg-[#333333]"
@@ -112,6 +127,9 @@ export default function CheckoutPage() {
   const [postalCode, setPostalCode] = useState("");
   const [phone, setPhone] = useState("");
   const [step, setStep] = useState<"shipping" | "payment">("shipping");
+  const [shippingMethod, setShippingMethod] = useState<ShippingMethodOption | null>(null);
+  const [servicePoint, setServicePoint] = useState<SelectedServicePoint | null>(null);
+  const [formError, setFormError] = useState("");
   const [paymentData, setPaymentData] = useState<{
     clientSecret: string;
     orderId: number;
@@ -119,8 +137,20 @@ export default function CheckoutPage() {
     total: number;
   } | null>(null);
 
+  const cartItems = cart?.items || [];
+  const cartTotal = parseFloat(String(cart?.total || "0"));
+
+  // Frais de port calcules par le backend (seuil de gratuite + tarif transporteur).
+  const { data: quote } = trpc.shipping.quote.useQuery({
+    subtotal: cartTotal,
+    methodId: shippingMethod?.id,
+  });
+  const shippingCost = quote?.cost ?? 0;
+  const finalTotal = cartTotal + shippingCost;
+
   const createPayment = trpc.stripe.createPaymentIntent.useMutation({
     onSuccess: (data) => { setPaymentData(data); setStep("payment"); },
+    onError: (err) => setFormError(err.message),
   });
 
   // Load Stripe with key from backend config
@@ -132,27 +162,34 @@ export default function CheckoutPage() {
     return loadStripe("pk_test_dummy");
   }, [stripeConfig?.publishableKey]);
 
+  const needsServicePoint = shippingMethod?.requiresServicePoint ?? false;
+
   const handleShippingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError("");
     if (!cart?.items?.length) return;
+
+    if (needsServicePoint && !servicePoint) {
+      setFormError("Merci de choisir un point relais pour cette methode de livraison.");
+      return;
+    }
+
     const items = cart.items.map((item) => ({
       productId: item.productId,
       quantity: item.quantity,
       color: item.color || undefined,
       size: item.size || undefined,
     }));
+
     createPayment.mutate({
-      amount: Math.round(parseFloat(String(cart.total)) * 100),
+      amount: Math.round(finalTotal * 100),
       email,
       items,
-      shipping: { firstName, lastName, address, city, postalCode, phone },
+      shipping: { firstName, lastName, address, city, postalCode, phone, country: "France" },
+      shippingMethodId: shippingMethod?.id,
+      servicePoint: needsServicePoint && servicePoint ? servicePoint : undefined,
     });
   };
-
-  const cartItems = cart?.items || [];
-  const cartTotal = parseFloat(String(cart?.total || "0"));
-  const shippingCost = cartTotal >= 120 ? 0 : 5.9;
-  const finalTotal = cartTotal + shippingCost;
 
   return (
     <div className="pt-[92px] min-h-[100dvh] bg-[#f4f4f4]">
@@ -220,6 +257,34 @@ export default function CheckoutPage() {
                     className="w-full border border-[#e0e0e0] px-3 py-2.5 text-[0.875rem] outline-none focus:border-[#222222] bg-white" />
                 </div>
 
+                {/* Mode de livraison */}
+                <div className="bg-white border border-[#e8e8e8] p-5 space-y-4">
+                  <h2 className="text-[0.75rem] uppercase tracking-[1px] text-[#222222]">Mode de livraison</h2>
+                  <ShippingMethodSelector
+                    value={shippingMethod?.id ?? null}
+                    onChange={(method) => {
+                      setShippingMethod(method);
+                      setServicePoint(null);
+                    }}
+                    subtotal={cartTotal}
+                  />
+                  {needsServicePoint && shippingMethod && (
+                    <ServicePointPicker
+                      carrier={shippingMethod.carrier}
+                      postalCode={postalCode}
+                      city={city || undefined}
+                      value={servicePoint}
+                      onChange={setServicePoint}
+                    />
+                  )}
+                </div>
+
+                {formError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-[0.8125rem]">
+                    {formError}
+                  </div>
+                )}
+
                 <button type="submit" disabled={createPayment.isPending}
                   className="w-full bg-[#222222] text-white py-3.5 text-[0.75rem] uppercase tracking-[2px] hover:bg-[#333333] disabled:opacity-50">
                   {createPayment.isPending ? "Chargement..." : "Continuer vers le paiement"}
@@ -232,6 +297,12 @@ export default function CheckoutPage() {
                   orderId={paymentData.orderId}
                   orderNumber={paymentData.orderNumber}
                   total={paymentData.total}
+                  carrierName={
+                    shippingMethod
+                      ? `${carrierLabel(shippingMethod.carrier)} — ${shippingMethod.name}`
+                      : null
+                  }
+                  servicePoint={servicePoint}
                 />
               </Elements>
             ) : null}
@@ -265,8 +336,13 @@ export default function CheckoutPage() {
               </div>
               <div className="flex justify-between text-[0.8125rem]">
                 <span className="text-[#666666]">Livraison</span>
-                <span>{shippingCost === 0 ? "Offerte" : `€${shippingCost.toFixed(2)}`}</span>
+                <span>{quote?.free ? "Offerte" : `€${shippingCost.toFixed(2)}`}</span>
               </div>
+              {quote && !quote.free && quote.remaining > 0 && (
+                <p className="text-[0.6875rem] text-[#999999]">
+                  Plus que €{quote.remaining.toFixed(2)} pour la livraison offerte
+                </p>
+              )}
               <div className="flex justify-between text-[0.9375rem] font-medium border-t border-[#f0f0f0] pt-2">
                 <span>Total</span>
                 <span>€{finalTotal.toFixed(2)}</span>

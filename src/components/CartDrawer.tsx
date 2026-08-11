@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { X, Plus, Minus, ShoppingBag } from "lucide-react";
+import { Shipping } from "@contracts/constants";
 import { trpc } from "@/providers/trpc";
 
 interface CartDrawerProps {
@@ -20,8 +21,16 @@ export default function CartDrawer({ open, onClose }: CartDrawerProps) {
     onSuccess: () => utils.cart.get.invalidate(),
   });
 
+  const { data: shippingSettings } = trpc.shipping.settings.useQuery(undefined, {
+    staleTime: 1000 * 60 * 5,
+    retry: false,
+  });
+
   const items = cart?.items || [];
   const total = cart?.total || "0";
+  const subtotal = parseFloat(String(total)) || 0;
+  const threshold = shippingSettings?.threshold ?? Shipping.freeThreshold;
+  const missingForFreeShipping = Math.max(0, threshold - subtotal);
 
   return (
     <>
@@ -121,11 +130,20 @@ export default function CartDrawer({ open, onClose }: CartDrawerProps) {
               <div className="pt-4 border-t border-[#e0e0e0] mt-4">
                 <div className="flex justify-between mb-1">
                   <span className="text-[0.8125rem] text-[#666666]">Sous-total</span>
-                  <span className="text-[0.875rem]">€{parseFloat(String(total)).toFixed(2)}</span>
+                  <span className="text-[0.875rem]">€{subtotal.toFixed(2)}</span>
                 </div>
-                <p className="text-[0.6875rem] text-[#999999] mb-4">
-                  Livraison offerte a partir de 120€
-                </p>
+                {missingForFreeShipping > 0 ? (
+                  <div className="mb-4">
+                    <p className="text-[0.6875rem] text-[#999999]">
+                      Livraison offerte a partir de {threshold}€ — En {Shipping.zone}
+                    </p>
+                    <p className="text-[0.6875rem] text-[#666666] mt-0.5">
+                      Plus que €{missingForFreeShipping.toFixed(2)} pour la livraison offerte
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-[0.6875rem] text-[#222222] mb-4">Livraison offerte !</p>
+                )}
                 <Link
                   to="/checkout"
                   onClick={onClose}

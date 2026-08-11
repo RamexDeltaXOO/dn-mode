@@ -3,6 +3,16 @@ import { Link } from "react-router";
 import { Instagram } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 
+const PAYMENT_METHODS = [
+  "AMEX",
+  "Apple Pay",
+  "CB",
+  "Mastercard",
+  "PayPal",
+  "Shop Pay",
+  "Visa",
+];
+
 export default function Footer() {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
@@ -64,8 +74,8 @@ export default function Footer() {
 
           {/* Logo */}
           <div className="flex items-start justify-center lg:justify-center">
-            <Link to="/" className="font-['Playfair_Display'] text-[1.5rem] tracking-[-0.5px]">
-              dn mode
+            <Link to="/" aria-label="DN MODE">
+              <img src="/logo-dnmode.png" alt="DN MODE" className="h-8 w-auto" />
             </Link>
           </div>
 
@@ -73,7 +83,7 @@ export default function Footer() {
           <div>
             <div className="text-[0.6875rem] uppercase tracking-[1.5px] mb-4">Français</div>
             <div className="flex flex-wrap gap-2 opacity-60">
-              {["AMEX", "Apple Pay", "CB", "Klarna", "Mastercard", "PayPal", "Shop Pay", "Visa"].map((method) => (
+              {PAYMENT_METHODS.map((method) => (
                 <span key={method} className="text-[0.625rem] border border-[#e0e0e0] px-2 py-1 text-[#666666]">
                   {method}
                 </span>

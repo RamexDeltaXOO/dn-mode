@@ -38,8 +38,8 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
       >
         <div className="p-6 h-full flex flex-col">
           <div className="flex items-center justify-between mb-8">
-            <Link to="/" onClick={onClose} className="font-['Playfair_Display'] text-lg tracking-[-0.5px]">
-              dn mode
+            <Link to="/" onClick={onClose} aria-label="DN MODE">
+              <img src="/logo-dnmode.png" alt="DN MODE" className="h-6 w-auto" />
             </Link>
             <button onClick={onClose} className="p-1 hover:opacity-60">
               <X size={20} strokeWidth={1.5} />

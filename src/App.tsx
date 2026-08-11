@@ -19,6 +19,7 @@ import AdminCampaigns from "./pages/admin/AdminCampaigns";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminLayout from "./pages/admin/AdminLayout";
 import Login from "./pages/Login";
+import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 
 function App() {
@@ -38,6 +39,7 @@ function App() {
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/login" element={<Login />} />
       </Route>
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<AdminDashboard />} />
         <Route path="analytics" element={<AdminAnalytics />} />

@@ -3,37 +3,86 @@ import { eq } from "drizzle-orm";
 import { createRouter, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { emailTemplates, newsletterSubscribers } from "@db/schema";
+import { Shipping } from "@contracts/constants";
+import {
+  getFromEmail,
+  getResendApiKey,
+  getSupportEmail,
+  renderTemplate,
+  resolveTemplate,
+  sendTemplateEmail,
+} from "./lib/mailer";
+import {
+  DEFAULT_EMAIL_TEMPLATES,
+  ensureDefaultTemplates,
+  findDefaultTemplate,
+} from "./lib/email-templates";
 
-// Lazy init Resend
-let resendInstance: any = null;
-function getResend() {
-  if (!resendInstance) {
-    try {
-      const { Resend } = require("resend");
-      const apiKey = process.env.RESEND_API_KEY || "re_dummy";
-      if (apiKey === "re_dummy") return null;
-      resendInstance = new Resend(apiKey);
-    } catch {
-      return null;
-    }
+/** Valeurs de demonstration pour l'apercu dans le CRM. */
+const PREVIEW_SAMPLES: Record<string, string> = {
+  shopName: "DN MODE",
+  shopUrl: "https://dnmode.fr",
+  logoUrl: "https://dnmode.fr/logo-dnmode.png",
+  supportEmail: "sav@dnmode.fr",
+  supportUrl: "https://dnmode.fr/contact",
+  orderNumber: "DNM-20260811-A1B2C",
+  orderDate: "11/08/2026",
+  orderUrl: "https://dnmode.fr/checkout",
+  firstName: "Amina",
+  lastName: "Benali",
+  name: "Amina Benali",
+  email: "client@example.com",
+  subtotal: "119.80",
+  shippingCost: "Offerte",
+  discount: "0.00",
+  total: "119.80",
+  shippingAddress: "12 rue de la Paix<br />75002 Paris<br />France",
+  carrierName: "Mondial Relay",
+  servicePointBlock: "",
+  trackingNumber: "6A12345678901",
+  trackingUrl: "https://www.mondialrelay.fr/suivi-de-colis",
+  estimatedDays: "3-5 jours ouvres",
+  ticketRef: "SAV-000123",
+  subject: "Question sur ma commande",
+  customerMessage: "Bonjour, quand ma commande sera-t-elle expediee ?",
+  replyMessage: "Votre commande part demain, vous recevrez le suivi par email.",
+  agentName: "Service client",
+  freeShippingThreshold: String(Shipping.freeThreshold),
+};
+
+function withPreviewDefaults(
+  variables: string[] | null | undefined,
+  provided: Record<string, string>,
+): Record<string, string> {
+  const vars: Record<string, string> = { ...PREVIEW_SAMPLES };
+  for (const name of variables ?? []) {
+    if (!vars[name]) vars[name] = `[${name}]`;
   }
-  return resendInstance;
-}
-
-function getFromEmail(): string {
-  return process.env.FROM_EMAIL || "contact@dnmode.fr";
-}
-
-function replaceVariables(template: string, vars: Record<string, string> | undefined): string {
-  if (!vars) return template;
-  let result = template;
-  for (const [key, value] of Object.entries(vars)) {
-    result = result.replace(new RegExp(`{{${key}}}`, "g"), value);
+  // Le tableau produits est du HTML : on fournit un echantillon realiste.
+  if (!provided.itemsHtml) {
+    vars.itemsHtml =
+      '<tr><td style="padding:12px 0;border-bottom:1px solid #e8e8e8;font-size:13px;">Ensemble SUHA<br /><span style="font-size:11px;color:#999999;">Noir / M</span></td>' +
+      '<td align="center" style="padding:12px 8px;border-bottom:1px solid #e8e8e8;font-size:13px;color:#666666;">x2</td>' +
+      '<td align="right" style="padding:12px 0;border-bottom:1px solid #e8e8e8;font-size:13px;">€67.80</td></tr>';
   }
-  return result;
+  return { ...vars, ...provided };
 }
 
 export const emailRouter = createRouter({
+  status: adminQuery.query(async () => {
+    const apiKey = await getResendApiKey();
+    return {
+      provider: apiKey ? ("resend" as const) : ("demo" as const),
+      fromEmail: await getFromEmail(),
+      supportEmail: await getSupportEmail(),
+    };
+  }),
+
+  /** Cree en base les gabarits par defaut manquants. */
+  seedDefaults: adminQuery.mutation(async () => {
+    return ensureDefaultTemplates();
+  }),
+
   listTemplates: adminQuery.query(async () => {
     const db = getDb();
     return db.select().from(emailTemplates).orderBy(emailTemplates.key);
@@ -58,12 +107,17 @@ export const emailRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = getDb();
       const { key, ...data } = input;
-      const updateData: Record<string, any> = {};
+      // Drizzle attend les noms de proprietes JS (htmlBody / textBody),
+      // pas les noms de colonnes SQL.
+      const updateData: Partial<typeof emailTemplates.$inferInsert> = {};
       if (data.subject !== undefined) updateData.subject = data.subject;
-      if (data.htmlBody !== undefined) updateData.html_body = data.htmlBody;
-      if (data.textBody !== undefined) updateData.text_body = data.textBody;
+      if (data.htmlBody !== undefined) updateData.htmlBody = data.htmlBody;
+      if (data.textBody !== undefined) updateData.textBody = data.textBody;
       if (data.isActive !== undefined) updateData.isActive = data.isActive;
-      await db.update(emailTemplates).set(updateData).where(eq(emailTemplates.key, key));
+
+      if (Object.keys(updateData).length > 0) {
+        await db.update(emailTemplates).set(updateData).where(eq(emailTemplates.key, key));
+      }
       const [updated] = await db.select().from(emailTemplates).where(eq(emailTemplates.key, key));
       return updated;
     }),
@@ -74,11 +128,21 @@ export const emailRouter = createRouter({
       variables: z.record(z.string(), z.string()).optional(),
     }))
     .query(async ({ input }) => {
-      const db = getDb();
-      const [t] = await db.select().from(emailTemplates).where(eq(emailTemplates.key, input.key));
-      if (!t) return null;
-      const html = replaceVariables(t.htmlBody, input.variables || {});
-      return { subject: t.subject, html, textBody: t.textBody };
+      const resolved = await resolveTemplate(input.key);
+      if (!resolved) return null;
+
+      const declared =
+        findDefaultTemplate(input.key)?.variables ??
+        DEFAULT_EMAIL_TEMPLATES.find((t) => t.key === input.key)?.variables ??
+        [];
+      const vars = withPreviewDefaults(declared, input.variables || {});
+
+      return {
+        subject: renderTemplate(resolved.subject, vars),
+        html: renderTemplate(resolved.htmlBody, vars),
+        textBody: resolved.textBody ? renderTemplate(resolved.textBody, vars) : null,
+        source: resolved.source,
+      };
     }),
 
   send: adminQuery
@@ -88,34 +152,14 @@ export const emailRouter = createRouter({
       variables: z.record(z.string(), z.string()).optional(),
     }))
     .mutation(async ({ input }) => {
-      const db = getDb();
-      const [t] = await db.select().from(emailTemplates).where(eq(emailTemplates.key, input.templateKey));
-      if (!t) throw new Error("Template not found");
-
-      const html = replaceVariables(t.htmlBody, input.variables);
-      const subject = replaceVariables(t.subject, input.variables);
-      const text = t.textBody ? replaceVariables(t.textBody, input.variables) : "";
-
-      // Try Resend
-      const resend = getResend();
-      if (resend) {
-        try {
-          await resend.emails.send({
-            from: getFromEmail(),
-            to: input.to,
-            subject,
-            html,
-            text,
-          });
-          return { success: true, sentVia: "resend" };
-        } catch (e: any) {
-          return { success: false, error: e.message };
-        }
-      }
-
-      // Demo mode
-      console.log("[DEMO EMAIL] To:", input.to, "Subject:", subject);
-      return { success: true, sentVia: "demo", html, subject };
+      const declared = findDefaultTemplate(input.templateKey)?.variables ?? [];
+      const vars = withPreviewDefaults(declared, input.variables || {});
+      const result = await sendTemplateEmail({
+        to: input.to,
+        templateKey: input.templateKey,
+        variables: vars,
+      });
+      return result;
     }),
 
   sendBulk: adminQuery
@@ -126,31 +170,20 @@ export const emailRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = getDb();
       const subscribers = await db.select().from(newsletterSubscribers);
-      const resend = getResend();
-
-      const [t] = await db.select().from(emailTemplates).where(eq(emailTemplates.key, input.templateKey));
-      if (!t) throw new Error("Template not found");
+      const declared = findDefaultTemplate(input.templateKey)?.variables ?? [];
 
       let sent = 0;
       for (const sub of subscribers) {
-        const vars = input.variables ? { ...input.variables, email: sub.email } : { email: sub.email };
-        const html = replaceVariables(t.htmlBody, vars);
-        const subject = replaceVariables(t.subject, input.variables);
-
-        if (resend) {
-          try {
-            await resend.emails.send({
-              from: getFromEmail(),
-              to: sub.email,
-              subject,
-              html,
-            });
-            sent++;
-          } catch { /* skip */ }
-        } else {
-          console.log("[DEMO BULK] To:", sub.email, "Subject:", subject);
-          sent++;
-        }
+        const vars = withPreviewDefaults(declared, {
+          ...(input.variables || {}),
+          email: sub.email,
+        });
+        const result = await sendTemplateEmail({
+          to: sub.email,
+          templateKey: input.templateKey,
+          variables: vars,
+        });
+        if (result.success) sent++;
       }
 
       return { success: true, sent, total: subscribers.length };

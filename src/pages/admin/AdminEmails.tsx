@@ -10,6 +10,9 @@ export default function AdminEmails() {
   });
   const sendEmail = trpc.email.send.useMutation();
   const sendBulk = trpc.email.sendBulk.useMutation();
+  const seedDefaults = trpc.email.seedDefaults.useMutation({
+    onSuccess: () => utils.email.listTemplates.invalidate(),
+  });
 
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ subject: "", htmlBody: "", textBody: "" });
@@ -32,12 +35,21 @@ export default function AdminEmails() {
   const openPreview = (t: any) => {
     setPreviewKey(t.key);
     setEditingKey(null);
-    try {
-      const vars: Record<string, string> = {};
-      const parsed = JSON.parse(t.variables || "[]");
-      parsed.forEach((v: string) => { vars[v] = v === "email" ? "test@example.com" : v === "total" ? "49.90" : v === "orderNumber" ? "DNM-0001" : `{{${v}}}`; });
-      setPreviewVars(vars);
-    } catch { setPreviewVars({}); }
+    // `variables` est une colonne JSON : Drizzle renvoie deja un tableau.
+    // On tolere aussi une chaine JSON pour les anciennes lignes.
+    const raw = t.variables;
+    let names: string[] = [];
+    if (Array.isArray(raw)) {
+      names = raw;
+    } else if (typeof raw === "string") {
+      try { names = JSON.parse(raw); } catch { names = []; }
+    }
+    // Les valeurs non fournies sont completees cote serveur par des exemples.
+    const vars: Record<string, string> = {};
+    names.forEach((v) => {
+      if (v === "email") vars[v] = "test@example.com";
+    });
+    setPreviewVars(vars);
   };
 
   const handleSendTest = (key: string) => {
@@ -67,6 +79,22 @@ export default function AdminEmails() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Templates List */}
         <div className="space-y-3">
+          {templates?.length === 0 && (
+            <div className="bg-white border border-[#e8e8e8] p-6 text-center">
+              <Mail size={32} className="text-[#e0e0e0] mx-auto mb-3" />
+              <p className="text-[0.875rem] text-[#666666] mb-1">Aucun template</p>
+              <p className="text-[0.75rem] text-[#999999] mb-4">
+                Creez les gabarits de commande et de SAV fournis avec la boutique.
+              </p>
+              <button
+                onClick={() => seedDefaults.mutate()}
+                disabled={seedDefaults.isPending}
+                className="bg-[#222222] text-white px-4 py-2 text-[0.6875rem] uppercase tracking-[1.5px] hover:bg-[#333333] disabled:opacity-50"
+              >
+                {seedDefaults.isPending ? "Creation..." : "Creer les templates par defaut"}
+              </button>
+            </div>
+          )}
           {templates?.map((t) => (
             <div key={t.key} className="bg-white border border-[#e8e8e8] p-4">
               <div className="flex items-center justify-between mb-2">

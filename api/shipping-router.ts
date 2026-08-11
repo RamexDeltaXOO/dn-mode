@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { shippingMethods } from "@db/schema";
+import { getShippingSettings, quoteShipping } from "./lib/shipping";
 
 export const shippingRouter = createRouter({
   list: publicQuery.query(async () => {
@@ -15,6 +16,21 @@ export const shippingRouter = createRouter({
     return db.select().from(shippingMethods).orderBy(shippingMethods.sortOrder);
   }),
 
+  /** Reglages de livraison (seuil de gratuite, frais par defaut, bandeau). */
+  settings: publicQuery.query(async () => {
+    return getShippingSettings();
+  }),
+
+  /** Calcul des frais de port pour un sous-total et une methode donnes. */
+  quote: publicQuery
+    .input(z.object({
+      subtotal: z.number().min(0),
+      methodId: z.number().optional(),
+    }))
+    .query(async ({ input }) => {
+      return quoteShipping({ subtotal: input.subtotal, methodId: input.methodId ?? null });
+    }),
+
   create: adminQuery
     .input(z.object({
       name: z.string().min(1),
@@ -23,6 +39,8 @@ export const shippingRouter = createRouter({
       estimatedDays: z.string().optional(),
       config: z.string().optional(),
       sortOrder: z.number().optional(),
+      sendcloudMethodId: z.number().optional(),
+      requiresServicePoint: z.boolean().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = getDb();
@@ -33,8 +51,10 @@ export const shippingRouter = createRouter({
         estimatedDays: input.estimatedDays || null,
         config: input.config ? JSON.parse(input.config) : null,
         sortOrder: input.sortOrder || 0,
+        sendcloudMethodId: input.sendcloudMethodId ?? null,
+        requiresServicePoint: input.requiresServicePoint ?? false,
       });
-      return { id: Number((result as any)[0].insertId) };
+      return { id: Number((result as unknown as Array<{ insertId: number }>)[0].insertId) };
     }),
 
   update: adminQuery
@@ -47,12 +67,15 @@ export const shippingRouter = createRouter({
       isActive: z.boolean().optional(),
       config: z.string().optional(),
       sortOrder: z.number().optional(),
+      sendcloudMethodId: z.number().optional(),
+      requiresServicePoint: z.boolean().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = getDb();
-      const { id, ...raw } = input;
-      const data: Record<string, any> = { ...raw };
-      if (data.price !== undefined) data.price = String(data.price);
+      const { id, config, price, ...rest } = input;
+      const data: Partial<typeof shippingMethods.$inferInsert> = { ...rest };
+      if (price !== undefined) data.price = String(price);
+      if (config !== undefined) data.config = JSON.parse(config);
       await db.update(shippingMethods).set(data).where(eq(shippingMethods.id, id));
       return { success: true };
     }),
@@ -63,32 +86,5 @@ export const shippingRouter = createRouter({
       const db = getDb();
       await db.delete(shippingMethods).where(eq(shippingMethods.id, input.id));
       return { success: true };
-    }),
-
-  // Calculate shipping cost based on address and method
-  calculate: publicQuery
-    .input(z.object({
-      postalCode: z.string(),
-      country: z.string().default("France"),
-      subtotal: z.number(),
-      methodId: z.number(),
-    }))
-    .query(async ({ input }) => {
-      const db = getDb();
-      const [method] = await db.select().from(shippingMethods).where(eq(shippingMethods.id, input.methodId));
-      if (!method || !method.isActive) return { cost: 0, free: false, method: null };
-
-      const price = parseFloat(String(method.price));
-      const free = input.subtotal >= 120;
-
-      return {
-        cost: free ? 0 : price,
-        free,
-        method: {
-          name: method.name,
-          carrier: method.carrier,
-          estimatedDays: method.estimatedDays,
-        },
-      };
     }),
 });

@@ -1,6 +1,8 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "../api/queries/connection";
-import { collections, categories, products } from "./schema";
+import { ensureDefaultTemplates } from "../api/lib/email-templates";
+import { Shipping } from "../contracts/constants";
+import { collections, categories, products, shippingMethods, siteConfig } from "./schema";
 
 async function seed() {
   const db = getDb();
@@ -285,6 +287,65 @@ async function seed() {
     }
   }
   console.log("Products seeded");
+
+  // ── Shipping methods (Sendcloud : Colissimo / Chronopost / Mondial Relay) ──
+  const shippingData = [
+    {
+      name: "Colissimo Domicile",
+      carrier: "colissimo",
+      price: "5.90",
+      estimatedDays: "2-3 jours",
+      requiresServicePoint: false,
+      sortOrder: 1,
+    },
+    {
+      name: "Chronopost Express",
+      carrier: "chronopost",
+      price: "9.90",
+      estimatedDays: "24h",
+      requiresServicePoint: false,
+      sortOrder: 2,
+    },
+    {
+      name: "Mondial Relay Point Relais",
+      carrier: "mondial_relay",
+      price: "4.50",
+      estimatedDays: "3-5 jours",
+      requiresServicePoint: true,
+      sortOrder: 3,
+    },
+  ];
+
+  for (const method of shippingData) {
+    const existing = await db
+      .select()
+      .from(shippingMethods)
+      .where(eq(shippingMethods.name, method.name));
+    if (existing.length === 0) {
+      await db.insert(shippingMethods).values({ ...method, countries: ["FR"], isActive: true });
+    }
+  }
+  console.log("Shipping methods seeded");
+
+  // ── Email templates (commandes + SAV) ────────────────────
+  const { created, total } = await ensureDefaultTemplates();
+  console.log(`Email templates seeded (${created} created / ${total} total)`);
+
+  // ── Site config par defaut (jamais ecrasee si deja definie) ──
+  const configDefaults: Array<{ key: string; value: string }> = [
+    { key: "site_name", value: "DN MODE" },
+    { key: "shipping_threshold", value: String(Shipping.freeThreshold) },
+    { key: "shipping_cost", value: Shipping.defaultCost.toFixed(2) },
+    { key: "currency", value: "EUR" },
+  ];
+
+  for (const config of configDefaults) {
+    const existing = await db.select().from(siteConfig).where(eq(siteConfig.key, config.key));
+    if (existing.length === 0) {
+      await db.insert(siteConfig).values(config);
+    }
+  }
+  console.log("Site config seeded");
 
   console.log("Seeding complete!");
   process.exit(0);

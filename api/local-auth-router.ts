@@ -19,7 +19,7 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
   return computed === hash;
 }
 
-function generateToken(userId: number, email: string, role: string): string {
+export function generateToken(userId: number, email: string, role: string): string {
   const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const payload = btoa(JSON.stringify({ sub: userId, email, role, iat: Date.now(), exp: Date.now() + 7 * 24 * 60 * 60 * 1000 }));
   const signature = btoa(`${header}.${payload}.dnmode-secret-key-2026`);
