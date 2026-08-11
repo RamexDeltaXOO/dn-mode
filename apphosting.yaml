@@ -1,0 +1,80 @@
+# Firebase App Hosting — deploiement du serveur Hono (API tRPC + SPA).
+# L'app tourne dans une revision Cloud Run : App Hosting build depuis GitHub,
+# puis lance runCommand. Le CDN est place devant automatiquement.
+
+runConfig:
+  cpu: 1
+  memoryMiB: 512
+  minInstances: 0 # passer a 1 pour eviter les demarrages a froid
+  maxInstances: 10
+  concurrency: 80
+
+scripts:
+  buildCommand: npm run build
+  # `npm run start` positionne NODE_ENV=production, ce qui est INDISPENSABLE :
+  # api/boot.ts ne demarre le serveur HTTP que si env.isProduction est vrai.
+  runCommand: npm run start
+
+env:
+  # ── Obligatoires : api/lib/env.ts leve une erreur au boot si l'une manque ──
+  - variable: APP_ID
+    value: dn-mode
+    availability:
+      - RUNTIME
+
+  # Connexion MySQL : mysql://user:pass@host:3306/base
+  # A creer dans Cloud Secret Manager :
+  #   firebase apphosting:secrets:set databaseUrl
+  - variable: DATABASE_URL
+    secret: databaseUrl
+    availability:
+      - RUNTIME
+
+  # Secret de signature des jetons de session.
+  #   firebase apphosting:secrets:set appSecret
+  - variable: APP_SECRET
+    secret: appSecret
+    availability:
+      - RUNTIME
+
+  # Heritage de l'OAuth Kimi : encore exige par env.ts et charge au demarrage
+  # par api/kimi/auth.ts (new URL(...)). Doit rester une URL valide meme si
+  # la connexion Kimi n'est pas utilisee.
+  - variable: KIMI_AUTH_URL
+    value: https://auth.kimi.com
+    availability:
+      - RUNTIME
+  - variable: KIMI_OPEN_URL
+    value: https://open.kimi.com
+    availability:
+      - RUNTIME
+
+  # ── URL publique, utilisee dans les liens des emails ──
+  - variable: PUBLIC_APP_URL
+    value: https://dnmode.fr
+    availability:
+      - RUNTIME
+
+  # ── Cles d'API ──
+  # Elles se saisissent normalement depuis le CRM (Admin > Parametres), qui les
+  # stocke en base. Les entrees ci-dessous ne sont qu'un repli optionnel :
+  # decommenter et creer le secret correspondant si tu preferes les figer ici.
+  #
+  # - variable: STRIPE_SECRET_KEY
+  #   secret: stripeSecretKey
+  #   availability: [RUNTIME]
+  # - variable: SENDCLOUD_PUBLIC_KEY
+  #   secret: sendcloudPublicKey
+  #   availability: [RUNTIME]
+  # - variable: SENDCLOUD_SECRET_KEY
+  #   secret: sendcloudSecretKey
+  #   availability: [RUNTIME]
+  # - variable: GOOGLE_CLIENT_ID
+  #   secret: googleClientId
+  #   availability: [RUNTIME]
+  # - variable: GOOGLE_CLIENT_SECRET
+  #   secret: googleClientSecret
+  #   availability: [RUNTIME]
+  # - variable: RESEND_API_KEY
+  #   secret: resendApiKey
+  #   availability: [RUNTIME]
