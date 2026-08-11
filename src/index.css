@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 13.3%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 13.3%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 13.3%;
+    --primary: 0 0% 10.2%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 95.7%;
+    --secondary-foreground: 0 0% 10.2%;
+    --muted: 0 0% 95.7%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 0 0% 95.7%;
+    --accent-foreground: 0 0% 10.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 87.8%;
+    --input: 0 0% 87.8%;
+    --ring: 0 0% 10.2%;
+    --radius: 0rem;
+    --chart-1: 0 0% 10.2%;
+    --chart-2: 0 0% 40%;
+    --chart-3: 0 0% 60%;
+    --chart-4: 0 0% 80%;
+    --chart-5: 0 0% 90%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-[#f4f4f4] text-[#222222] antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer components {
+  .section-label {
+    @apply text-[0.6875rem] uppercase tracking-[2px] text-[#999999];
+  }
+
+  .product-title {
+    @apply text-[0.875rem] font-medium uppercase tracking-[1px] text-[#222222];
+  }
+
+  .btn-text {
+    @apply text-[0.75rem] uppercase tracking-[2px];
+  }
+}
