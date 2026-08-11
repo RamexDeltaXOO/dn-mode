@@ -247,7 +247,7 @@ export function createGoogleCallbackHandler() {
       const user = await findOrCreateGoogleUser(profile);
       if (!user) return c.redirect(`${Paths.login}?error=google_account`, 302);
 
-      const sessionToken = generateToken(user.id, user.email ?? profile.email, user.role);
+      const sessionToken = await generateToken(user.id, user.email ?? profile.email, user.role);
 
       // Le jeton passe par le FRAGMENT d'URL : il n'est ni journalise par les
       // proxies ni envoye au serveur lors de la redirection finale.

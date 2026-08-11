@@ -17,10 +17,6 @@ scripts:
 
 env:
   # ── Obligatoires : api/lib/env.ts leve une erreur au boot si l'une manque ──
-  - variable: APP_ID
-    value: dn-mode
-    availability:
-      - RUNTIME
 
   # Connexion MySQL : mysql://user:pass@host:3306/base
   # A creer dans Cloud Secret Manager :
@@ -30,22 +26,10 @@ env:
     availability:
       - RUNTIME
 
-  # Secret de signature des jetons de session.
+  # Secret de signature HMAC des jetons de session (chaine aleatoire longue).
   #   firebase apphosting:secrets:set appSecret
   - variable: APP_SECRET
     secret: appSecret
-    availability:
-      - RUNTIME
-
-  # Heritage de l'OAuth Kimi : encore exige par env.ts et charge au demarrage
-  # par api/kimi/auth.ts (new URL(...)). Doit rester une URL valide meme si
-  # la connexion Kimi n'est pas utilisee.
-  - variable: KIMI_AUTH_URL
-    value: https://auth.kimi.com
-    availability:
-      - RUNTIME
-  - variable: KIMI_OPEN_URL
-    value: https://open.kimi.com
     availability:
       - RUNTIME
 

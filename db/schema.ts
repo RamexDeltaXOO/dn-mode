@@ -10,9 +10,10 @@ import {
   json,
 } from "drizzle-orm/mysql-core";
 
-// ── Users (managed by Kimi OAuth) ──────────────────────────
+// ── Users ───────────────────────────────────────────────────
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
+  // Identifiant externe unique : "local_<uuid>" ou "google_<sub>".
   unionId: varchar("unionId", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 255 }),
   email: varchar("email", { length: 320 }),

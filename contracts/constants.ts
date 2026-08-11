@@ -1,16 +1,13 @@
-export const Session = {
-  cookieName: "kimi_sid",
-  maxAgeMs: 365 * 24 * 60 * 60 * 1000,
-} as const;
-
 export const ErrorMessages = {
   unauthenticated: "Authentication required",
   insufficientRole: "Insufficient permissions",
 } as const;
 
+/** Duree de validite d'un jeton de session (7 jours). */
+export const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
 export const Paths = {
   login: "/login",
-  oauthCallback: "/api/oauth/callback",
   googleAuthStart: "/api/auth/google",
   googleAuthCallback: "/api/auth/google/callback",
   authCallback: "/auth/callback",

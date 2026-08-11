@@ -18,8 +18,6 @@ export function useAuth() {
     retry: false,
   });
 
-  const logoutMutation = trpc.auth.logout.useMutation();
-  const { mutateAsync: revokeSession } = logoutMutation;
 
   const user: UnifiedUser | null = useMemo(() => {
     if (localUser) {
@@ -36,18 +34,12 @@ export function useAuth() {
 
   const isAuthenticated = !!user;
 
-  const logout = useCallback(async () => {
-    // Invalide le cookie de session cote serveur (best effort)
-    try {
-      await revokeSession();
-    } catch {
-      // Pas de session serveur (compte local ou Google) : on continue.
-    }
-    // Clear local token
+  const logout = useCallback(() => {
+    // La session tient entierement dans le jeton stocke cote client :
+    // le supprimer suffit a se deconnecter.
     localStorage.removeItem("dnmode_local_token");
-    // Refresh page to clear state
     window.location.reload();
-  }, [revokeSession]);
+  }, []);
 
   return useMemo(
     () => ({

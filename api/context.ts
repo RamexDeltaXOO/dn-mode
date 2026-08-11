@@ -20,7 +20,7 @@ export async function createContext(
   try {
     const localToken = opts.req.headers.get("x-local-auth-token");
     if (localToken) {
-      const payload = verifyLocalToken(localToken);
+      const payload = await verifyLocalToken(localToken);
       if (payload) {
         const db = getDb();
         const [user] = await db.select().from(users).where(eq(users.id, payload.sub));
