@@ -9,6 +9,16 @@ runConfig:
   maxInstances: 10
   concurrency: 80
 
+  # Necessaire UNIQUEMENT si la base MySQL est sur Cloud SQL en IP privee.
+  # Avec un MySQL managé joignable en TCP/TLS (Scaleway, OVH, Aiven...),
+  # laisser ce bloc commente : DATABASE_URL suffit.
+  # L'acces VPC n'existe qu'a l'execution, jamais pendant le build.
+  #
+  # vpcAccess:
+  #   egress: PRIVATE_RANGES_ONLY
+  #   networkInterfaces:
+  #     - network: default
+
 scripts:
   buildCommand: npm run build
   # `npm run start` positionne NODE_ENV=production, ce qui est INDISPENSABLE :

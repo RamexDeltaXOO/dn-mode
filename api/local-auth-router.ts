@@ -8,7 +8,7 @@ import { env } from "./lib/env";
 import { TRPCError } from "@trpc/server";
 
 // Password hashing using Web Crypto API (SHA-256 with salt)
-async function hashPassword(password: string): Promise<string> {
+export async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(password + "dnmode-salt-2026-v2");
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);

@@ -1,48 +1,60 @@
-import { getDb } from './api/queries/connection';
+import { eq } from "drizzle-orm";
+import { getDb } from "./api/queries/connection";
+import { users } from "./db/schema";
+import { hashPassword } from "./api/local-auth-router";
 
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + "dnmode-salt-2026-v2");
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
+/**
+ * Cree (ou met a jour) le compte administrateur du CRM.
+ *
+ * Identifiants fournis par variables d'environnement, jamais en dur dans le
+ * depot :
+ *   ADMIN_EMAIL=... ADMIN_PASSWORD=... npm run admin:create
+ */
 async function main() {
-  const db = getDb();
+  const email = process.env.ADMIN_EMAIL?.trim();
+  const password = process.env.ADMIN_PASSWORD;
 
-  // Add password_hash column if not exists
-  try {
-    await db.execute(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)`);
-    console.log('password_hash column added');
-  } catch (e: any) {
-    console.log('Column may already exist:', e.message?.substring(0, 100));
+  if (!email || !password) {
+    console.error(
+      "Variables manquantes.\n" +
+        "Usage : ADMIN_EMAIL=vous@exemple.fr ADMIN_PASSWORD='motdepasse' npm run admin:create",
+    );
+    process.exit(1);
   }
 
-  // Check if admin exists
-  const existing = await db.execute(`SELECT * FROM users WHERE email = 'admin@dnmode.fr'`);
-  const rows = existing as any[];
+  if (password.length < 12) {
+    console.error("Le mot de passe administrateur doit faire au moins 12 caracteres.");
+    process.exit(1);
+  }
 
-  const passwordHash = await hashPassword("dnmodeadmin123!");
+  const db = getDb();
+  const passwordHash = await hashPassword(password);
+  const name = process.env.ADMIN_NAME?.trim() || "Admin";
 
-  if (rows.length > 0 && rows[0].length > 0) {
-    // Update existing admin
-    await db.execute(`
-      UPDATE users 
-      SET password_hash = '${passwordHash}', role = 'admin', name = 'Admin'
-      WHERE email = 'admin@dnmode.fr'
-    `);
-    console.log('Admin account updated: admin@dnmode.fr / dnmodeadmin123!');
+  const [existing] = await db.select().from(users).where(eq(users.email, email));
+
+  if (existing) {
+    await db
+      .update(users)
+      .set({ passwordHash, role: "admin", name })
+      .where(eq(users.id, existing.id));
+    console.log(`Compte administrateur mis a jour : ${email}`);
   } else {
-    // Create admin
-    await db.execute(`
-      INSERT INTO users (unionId, email, name, role, password_hash, createdAt, updatedAt, lastSignInAt)
-      VALUES ('local_admin', 'admin@dnmode.fr', 'Admin', 'admin', '${passwordHash}', NOW(), NOW(), NOW())
-    `);
-    console.log('Admin account created: admin@dnmode.fr / dnmodeadmin123!');
+    await db.insert(users).values({
+      unionId: `local_${crypto.randomUUID()}`,
+      email,
+      name,
+      role: "admin",
+      provider: "local",
+      passwordHash,
+    });
+    console.log(`Compte administrateur cree : ${email}`);
   }
 
   process.exit(0);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
