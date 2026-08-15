@@ -233,7 +233,7 @@ export const stripeRouter = createRouter({
           const variables = await buildOrderEmailVariables({
             order,
             items,
-            reqUrl: ctx.req.url,
+            req: ctx.req,
           });
           const result = await sendTemplateEmail({
             to: order.email,

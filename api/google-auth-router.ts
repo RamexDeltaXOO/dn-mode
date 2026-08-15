@@ -6,20 +6,12 @@ import {
   encodeState,
   getGoogleCredentials,
 } from "./lib/google-oauth";
-
-/** Origine de la requete courante (fonctionne en dev comme en production). */
-function originFrom(url: string): string {
-  try {
-    return new URL(url).origin;
-  } catch {
-    return "";
-  }
-}
+import { originFromRequest } from "./lib/request-origin";
 
 export const googleAuthRouter = createRouter({
   getConfig: publicQuery.query(async ({ ctx }) => {
     const creds = await getGoogleCredentials();
-    const origin = originFrom(ctx.req.url);
+    const origin = originFromRequest(ctx.req);
     return {
       enabled: creds.enabled,
       clientId: creds.enabled ? creds.clientId : null,
@@ -33,11 +25,12 @@ export const googleAuthRouter = createRouter({
       const creds = await getGoogleCredentials();
       if (!creds.enabled) return { url: null };
 
-      const origin = originFrom(ctx.req.url);
+      // L'URI envoyee ici doit etre identique, au caractere pres, a celle que
+      // le callback reconstruira — d'ou la source commune originFromRequest.
       return {
         url: buildAuthUrl({
           clientId: creds.clientId,
-          redirectUri: buildRedirectUri(origin),
+          redirectUri: buildRedirectUri(originFromRequest(ctx.req)),
           state: encodeState(input.redirectTo ?? "/"),
         }),
       };

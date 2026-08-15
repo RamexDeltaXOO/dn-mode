@@ -16,8 +16,8 @@ function ticketRef(id: number): string {
 }
 
 /** Variables communes aux emails du service client. */
-async function savVariables(contact: Contact, reqUrl?: string) {
-  const shopUrl = await resolveShopUrl(reqUrl);
+async function savVariables(contact: Contact, req?: Request) {
+  const shopUrl = await resolveShopUrl(req);
   return {
     shopName: await getConfigValue(ConfigKeys.siteName, { fallback: "DN MODE" }),
     shopUrl,
@@ -59,7 +59,7 @@ export const contactRouter = createRouter({
           await sendTemplateEmail({
             to: created.email,
             templateKey: EmailTemplateKeys.savAcknowledgement,
-            variables: await savVariables(created, ctx.req.url),
+            variables: await savVariables(created, ctx.req),
             replyTo: await getSupportEmail(),
           });
         }
@@ -85,7 +85,7 @@ export const contactRouter = createRouter({
       }
 
       const supportEmail = await getSupportEmail();
-      const base = await savVariables(contact, ctx.req.url);
+      const base = await savVariables(contact, ctx.req);
       const result = await sendTemplateEmail({
         to: contact.email,
         templateKey: EmailTemplateKeys.savReply,

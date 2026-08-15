@@ -4,6 +4,7 @@ import { ConfigKeys, Paths } from "@contracts/constants";
 import type { User } from "@db/schema";
 import { users } from "@db/schema";
 import { getConfigValue } from "./site-config";
+import { originFromRequest } from "./request-origin";
 import { getDb } from "../queries/connection";
 import { generateToken } from "../local-auth-router";
 
@@ -231,7 +232,10 @@ export function createGoogleCallbackHandler() {
     }
 
     try {
-      const origin = new URL(c.req.url).origin;
+      // Origine reconstruite depuis les en-tetes de proxy : derriere le CDN,
+      // c.req.url est en http et l'URI ne correspondrait pas a celle declaree
+      // dans Google Cloud.
+      const origin = originFromRequest(c.req.raw);
       const redirectUri = buildRedirectUri(origin);
       const redirectTo = state ? decodeState(state) : "/";
 

@@ -9,6 +9,7 @@ import { getConfigValue } from "./lib/site-config";
 import { getShippingSettings, quoteShipping } from "./lib/shipping";
 import { buildOrderItemsHtml, escapeHtml } from "./lib/email-templates";
 import { getSupportEmail, sendTemplateEmail } from "./lib/mailer";
+import { originFromRequest } from "./lib/request-origin";
 
 export type OrderEmailItem = {
   productName: string;
@@ -31,14 +32,11 @@ function generateOrderNumber(): string {
   return `DNM-${day}-${suffix}`;
 }
 
-/** URL publique de la boutique : origine de la requete, sinon config. */
-export async function resolveShopUrl(reqUrl?: string): Promise<string> {
-  if (reqUrl) {
-    try {
-      return new URL(reqUrl).origin;
-    } catch {
-      /* ignore */
-    }
+/** URL publique de la boutique : origine reelle de la requete, sinon config. */
+export async function resolveShopUrl(req?: Request): Promise<string> {
+  if (req) {
+    const origin = originFromRequest(req);
+    if (origin) return origin;
   }
   return getConfigValue(ConfigKeys.siteUrl, {
     envKey: "PUBLIC_APP_URL",
@@ -50,10 +48,10 @@ export async function resolveShopUrl(reqUrl?: string): Promise<string> {
 export async function buildOrderEmailVariables(input: {
   order: Order;
   items: OrderEmailItem[];
-  reqUrl?: string;
+  req?: Request;
 }): Promise<Record<string, string>> {
   const { order, items } = input;
-  const shopUrl = await resolveShopUrl(input.reqUrl);
+  const shopUrl = await resolveShopUrl(input.req);
   const supportEmail = await getSupportEmail();
   const settings = await getShippingSettings();
   const shopName = await getConfigValue(ConfigKeys.siteName, { fallback: "DN MODE" });
@@ -106,10 +104,10 @@ async function safeSendOrderEmail(
   templateKey: string,
   order: Order,
   items: OrderEmailItem[],
-  reqUrl?: string,
+  req?: Request,
 ): Promise<void> {
   try {
-    const variables = await buildOrderEmailVariables({ order, items, reqUrl });
+    const variables = await buildOrderEmailVariables({ order, items, req });
     const result = await sendTemplateEmail({ to: order.email, templateKey, variables });
     if (!result.success) {
       console.error(`[email] ${templateKey} non envoye pour ${order.orderNumber}:`, result.error);
@@ -219,7 +217,7 @@ export const orderRouter = createRouter({
           EmailTemplateKeys.orderConfirmation,
           created,
           orderItemsData,
-          ctx.req.url,
+          ctx.req,
         );
       }
 
@@ -299,7 +297,7 @@ export const orderRouter = createRouter({
       const templateKey = templateByStatus[input.status];
       if (updated && templateKey) {
         const items = await db.select().from(orderItems).where(eq(orderItems.orderId, updated.id));
-        await safeSendOrderEmail(templateKey, updated, items, ctx.req.url);
+        await safeSendOrderEmail(templateKey, updated, items, ctx.req);
       }
 
       return updated;
