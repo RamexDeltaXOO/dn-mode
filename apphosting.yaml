@@ -9,15 +9,16 @@ runConfig:
   maxInstances: 10
   concurrency: 80
 
-  # Necessaire UNIQUEMENT si la base MySQL est sur Cloud SQL en IP privee.
-  # Avec un MySQL managé joignable en TCP/TLS (Scaleway, OVH, Aiven...),
-  # laisser ce bloc commente : DATABASE_URL suffit.
+  # La base MySQL est sur Cloud SQL en IP privee (10.76.0.3), dans le meme
+  # projet et la meme region que ce backend. Direct VPC Egress attache la
+  # revision Cloud Run au reseau `default`, qui est appaire avec Cloud SQL.
+  # PRIVATE_RANGES_ONLY : seul le trafic vers les plages privees passe par le
+  # VPC, le reste (Stripe, Sendcloud, Resend, Google) sort normalement.
   # L'acces VPC n'existe qu'a l'execution, jamais pendant le build.
-  #
-  # vpcAccess:
-  #   egress: PRIVATE_RANGES_ONLY
-  #   networkInterfaces:
-  #     - network: default
+  vpcAccess:
+    egress: PRIVATE_RANGES_ONLY
+    networkInterfaces:
+      - network: default
 
 scripts:
   buildCommand: npm run build
