@@ -1,6 +1,6 @@
 import { Fragment, useState } from "react";
 import { trpc } from "@/providers/trpc";
-import { ChevronDown, Package, MapPin, ExternalLink, FileDown } from "lucide-react";
+import { ChevronDown, Package, MapPin, ExternalLink, FileDown, Trash2 } from "lucide-react";
 import { carrierLabel } from "@contracts/constants";
 
 const statusColors: Record<string, string> = {
@@ -26,6 +26,7 @@ const statusOptions: OrderStatus[] = ["pending", "processing", "shipped", "deliv
 export default function AdminOrders() {
   const [statusFilter, setStatusFilter] = useState("");
   const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
+  const [feedback, setFeedback] = useState("");
 
   const { data: ordersData, isLoading } = trpc.order.list.useQuery(
     statusFilter ? { status: statusFilter, page: 1, limit: 50 } : { page: 1, limit: 50 }
@@ -33,6 +34,15 @@ export default function AdminOrders() {
   const utils = trpc.useUtils();
   const updateStatus = trpc.order.updateStatus.useMutation({
     onSuccess: () => utils.order.list.invalidate(),
+  });
+
+  const deleteOrder = trpc.order.delete.useMutation({
+    onSuccess: (data) => {
+      utils.order.list.invalidate();
+      setExpandedOrder(null);
+      if (data.success) setFeedback(`Commande ${data.orderNumber} supprimee.`);
+      setTimeout(() => setFeedback(""), 4000);
+    },
   });
 
   const createLabel = trpc.sendcloud.createLabel.useMutation({
@@ -51,7 +61,10 @@ export default function AdminOrders() {
 
   return (
     <div>
-      <h1 className="text-2xl font-light text-[#222222] mb-6">Commandes</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-light text-[#222222]">Commandes</h1>
+        {feedback && <span className="text-[0.8125rem] text-green-700">{feedback}</span>}
+      </div>
 
       {/* Filters */}
       <div className="flex gap-3 mb-4">
@@ -78,16 +91,17 @@ export default function AdminOrders() {
               <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Total</th>
               <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Statut</th>
               <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal"></th>
+              <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal"></th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Chargement...</td>
+                <td colSpan={7} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Chargement...</td>
               </tr>
             ) : orders.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Aucune commande</td>
+                <td colSpan={7} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Aucune commande</td>
               </tr>
             ) : (
               orders.map((order) => (
@@ -127,10 +141,29 @@ export default function AdminOrders() {
                         className={`text-[#999999] transition-transform ${expandedOrder === order.id ? "rotate-180" : ""}`}
                       />
                     </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (
+                            confirm(
+                              `Supprimer definitivement la commande ${order.orderNumber} ?\n\nLes articles et les paiements associes seront egalement supprimes. Cette action est irreversible.`,
+                            )
+                          ) {
+                            deleteOrder.mutate({ id: order.id });
+                          }
+                        }}
+                        disabled={deleteOrder.isPending}
+                        title="Supprimer la commande"
+                        className="p-1 hover:bg-red-50 text-red-600 disabled:opacity-40"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
                   </tr>
                   {expandedOrder === order.id && orderDetail && (
                     <tr>
-                      <td colSpan={6} className="px-4 py-4 bg-[#fafafa]">
+                      <td colSpan={7} className="px-4 py-4 bg-[#fafafa]">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
                             <h4 className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] mb-2">Articles</h4>

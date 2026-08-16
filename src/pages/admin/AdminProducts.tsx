@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { Pencil, Trash2, Plus, Search, X } from "lucide-react";
+import ImageUploader from "@/components/admin/ImageUploader";
 
 interface ProductForm {
   name: string;
@@ -8,7 +9,7 @@ interface ProductForm {
   price: string;
   description: string;
   shortDescription: string;
-  images: string;
+  images: string[];
   colors: string;
   sizes: string;
   inventoryQuantity: string;
@@ -23,7 +24,7 @@ const emptyForm: ProductForm = {
   price: "",
   description: "",
   shortDescription: "",
-  images: "",
+  images: [],
   colors: "",
   sizes: "",
   inventoryQuantity: "0",
@@ -82,7 +83,7 @@ export default function AdminProducts() {
       price: String(product.price),
       description: product.description || "",
       shortDescription: product.shortDescription || "",
-      images: (product.images || []).join(","),
+      images: product.images || [],
       colors: (product.colors || []).join(","),
       sizes: (product.sizes || []).join(","),
       inventoryQuantity: String(product.inventoryQuantity || 0),
@@ -101,7 +102,7 @@ export default function AdminProducts() {
       price: form.price,
       description: form.description || undefined,
       shortDescription: form.shortDescription || undefined,
-      images: form.images ? form.images.split(",").map((s) => s.trim()) : [],
+      images: form.images.filter((url) => url.trim() !== ""),
       colors: form.colors ? form.colors.split(",").map((s) => s.trim()) : [],
       sizes: form.sizes ? form.sizes.split(",").map((s) => s.trim()) : [],
       inventoryQuantity: parseInt(form.inventoryQuantity) || 0,
@@ -210,15 +211,10 @@ export default function AdminProducts() {
                   className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222] resize-none"
                 />
               </div>
-              <div>
-                <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Images (URLs separees par des virgules)</label>
-                <input
-                  value={form.images}
-                  onChange={(e) => setForm({ ...form, images: e.target.value })}
-                  placeholder="/product-1.jpg, /product-2.jpg"
-                  className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222]"
-                />
-              </div>
+              <ImageUploader
+                value={form.images}
+                onChange={(images) => setForm({ ...form, images })}
+              />
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Couleurs</label>

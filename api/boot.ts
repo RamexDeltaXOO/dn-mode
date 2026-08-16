@@ -6,6 +6,7 @@ import { appRouter } from "./router";
 import { createContext } from "./context";
 import { env } from "./lib/env";
 import { createGoogleCallbackHandler } from "./lib/google-oauth";
+import { createUploadHandler } from "./lib/storage";
 import { Paths } from "@contracts/constants";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
@@ -13,6 +14,8 @@ const app = new Hono<{ Bindings: HttpBindings }>();
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
 // Connexion via Gmail (Google OAuth 2.0)
 app.get(Paths.googleAuthCallback, createGoogleCallbackHandler());
+// Upload des images produits (multipart, hors tRPC)
+app.post(Paths.upload, createUploadHandler());
 app.use("/api/trpc/*", async (c) => {
   return fetchRequestHandler({
     endpoint: "/api/trpc",

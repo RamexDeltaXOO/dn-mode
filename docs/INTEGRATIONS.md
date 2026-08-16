@@ -73,6 +73,33 @@ redirige vers `/auth/callback#token=...`, ou le front stocke le jeton.
 Le bouton n'apparait sur la page de connexion que si les deux cles sont
 renseignees.
 
+## Stockage des images produits (compatible S3)
+
+`Admin > Parametres > Stockage des images`
+
+| Champ | Cle `site_config` | Variable d'env |
+| --- | --- | --- |
+| Endpoint S3 | `storage_endpoint` | `STORAGE_ENDPOINT` |
+| Bucket | `storage_bucket` | `STORAGE_BUCKET` |
+| Region | `storage_region` | `STORAGE_REGION` |
+| Access Key | `storage_access_key` | `STORAGE_ACCESS_KEY` |
+| Secret Key | `storage_secret_key` | `STORAGE_SECRET_KEY` |
+| URL publique | `storage_public_url` | `STORAGE_PUBLIC_URL` |
+
+Une fois renseigne, **Admin > Produits** accepte le glisser-deposer et la
+selection de fichiers : JPEG, PNG, WebP ou AVIF, 8 Mo maximum par image. La
+premiere image de la liste sert de vignette sur la boutique ; les fleches
+sous chaque miniature permettent de reordonner.
+
+Fonctionne avec Google Cloud Storage (mode interoperabilite S3, cles HMAC),
+Cloudflare R2, Scaleway Object Storage ou MinIO. Le bucket doit etre lisible
+publiquement pour que les photos s'affichent sur la boutique.
+
+Le fichier transite par le serveur (`POST /api/upload`, reserve aux
+administrateurs) plutot que par une URL pre-signee : cela evite d'avoir a
+configurer le CORS du bucket. Sans configuration, le formulaire produit reste
+utilisable en saisissant des URL a la main.
+
 ## Emails transactionnels (Resend)
 
 `Admin > Parametres > Emails transactionnels`

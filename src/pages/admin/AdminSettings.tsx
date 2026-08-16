@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/providers/trpc";
-import { Save, Check, CreditCard, Mail, Globe, Truck, Copy } from "lucide-react";
+import { Save, Check, CreditCard, Mail, Globe, Truck, Copy, Image } from "lucide-react";
 import { Paths, Shipping } from "@contracts/constants";
 
 type FieldProps = {
@@ -77,6 +77,13 @@ const EMPTY_FORM = {
   sendcloud_secret_key: "",
   sendcloud_sender_address_id: "",
   sendcloud_default_weight: "1",
+  // Stockage des images
+  storage_endpoint: "",
+  storage_region: "auto",
+  storage_bucket: "",
+  storage_access_key: "",
+  storage_secret_key: "",
+  storage_public_url: "",
   // Emails
   resend_api_key: "",
   from_email: "",
@@ -126,6 +133,7 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
     onSuccess: () => utils.sendcloud.status.invalidate(),
   });
 
+  const { data: storageStatus } = trpc.upload.status.useQuery(undefined, { retry: false });
   const { data: emailStatus } = trpc.email.status.useQuery(undefined, { retry: false });
   const seedTemplates = trpc.email.seedDefaults.useMutation({
     onSuccess: () => utils.email.listTemplates.invalidate(),
@@ -247,6 +255,34 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
               <p className="text-[0.6875rem] text-[#999999]">
                 Colissimo, Chronopost et Mondial Relay passent par Sendcloud. Sans cles, la boutique
                 fonctionne en mode demo (methodes et points relais fictifs).
+              </p>
+            </div>
+          </div>
+
+          {/* Stockage des images */}
+          <div className="bg-white shadow-sm border border-[#e8e8e8] p-6">
+            <SectionHeader
+              icon={Image}
+              title="Stockage des images"
+              badge={{
+                label: storageStatus?.configured ? "Actif" : "Non configure",
+                ok: Boolean(storageStatus?.configured),
+              }}
+            />
+            <div className="space-y-4">
+              <Field label="Endpoint S3" value={form.storage_endpoint} onChange={(v) => setForm({ ...form, storage_endpoint: v })} placeholder="https://storage.googleapis.com" />
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Bucket" value={form.storage_bucket} onChange={(v) => setForm({ ...form, storage_bucket: v })} placeholder="dnmode-images" />
+                <Field label="Region" value={form.storage_region} onChange={(v) => setForm({ ...form, storage_region: v })} placeholder="auto" />
+              </div>
+              <Field label="Access Key" value={form.storage_access_key} onChange={(v) => setForm({ ...form, storage_access_key: v })} placeholder="GOOG1E..." />
+              <Field label="Secret Key" value={form.storage_secret_key} onChange={(v) => setForm({ ...form, storage_secret_key: v })} type="password" placeholder="..." />
+              <Field label="URL publique (optionnel)" value={form.storage_public_url} onChange={(v) => setForm({ ...form, storage_public_url: v })} placeholder="https://images.dnmode.fr" />
+              <p className="text-[0.6875rem] text-[#999999]">
+                Compatible Google Cloud Storage (mode interoperabilite S3), Cloudflare R2, Scaleway
+                Object Storage. Le bucket doit etre accessible en lecture publique pour que les
+                photos s&apos;affichent sur la boutique. Sans configuration, les images s&apos;ajoutent
+                uniquement par URL.
               </p>
             </div>
           </div>

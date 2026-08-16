@@ -2,7 +2,7 @@ import { z } from "zod";
 import { eq, desc, sql } from "drizzle-orm";
 import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { orders, orderItems, products, carts, cartItems } from "@db/schema";
+import { orders, orderItems, products, carts, cartItems, payments } from "@db/schema";
 import type { Order } from "@db/schema";
 import { ConfigKeys, EmailTemplateKeys, carrierLabel } from "@contracts/constants";
 import { getConfigValue } from "./lib/site-config";
@@ -276,6 +276,29 @@ export const orderRouter = createRouter({
       const [{ count }] = await countQuery;
 
       return { orders: orderList, total: count };
+    }),
+
+  /**
+   * Supprime definitivement une commande, ses lignes et ses paiements.
+   * Aucun email n'est envoye : c'est une operation de menage cote CRM, pas
+   * une annulation client (pour cela, passer le statut a "cancelled").
+   */
+  delete: adminQuery
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [order] = await db.select().from(orders).where(eq(orders.id, input.id));
+      if (!order) {
+        return { success: false, error: "Commande introuvable" };
+      }
+
+      // Pas de cles etrangeres en base : on nettoie explicitement les
+      // lignes liees pour ne pas laisser d'orphelins.
+      await db.delete(orderItems).where(eq(orderItems.orderId, input.id));
+      await db.delete(payments).where(eq(payments.orderId, input.id));
+      await db.delete(orders).where(eq(orders.id, input.id));
+
+      return { success: true, orderNumber: order.orderNumber };
     }),
 
   updateStatus: adminQuery

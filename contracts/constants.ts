@@ -11,6 +11,7 @@ export const Paths = {
   googleAuthStart: "/api/auth/google",
   googleAuthCallback: "/api/auth/google/callback",
   authCallback: "/auth/callback",
+  upload: "/api/upload",
 } as const;
 
 // ── Livraison ───────────────────────────────────────────────
@@ -51,6 +52,13 @@ export const ConfigKeys = {
   googleClientId: "gmail_client_id",
   googleClientSecret: "gmail_client_secret",
 
+  storageEndpoint: "storage_endpoint",
+  storageRegion: "storage_region",
+  storageBucket: "storage_bucket",
+  storageAccessKey: "storage_access_key",
+  storageSecretKey: "storage_secret_key",
+  storagePublicUrl: "storage_public_url",
+
   resendApiKey: "resend_api_key",
   fromEmail: "from_email",
 } as const;
@@ -82,6 +90,16 @@ export function carrierLabel(code: string): string {
 export function carrierNeedsServicePoint(code: string): boolean {
   return CARRIER_LIST.find((c) => c.code === code)?.servicePoint ?? false;
 }
+
+// ── Upload d'images produits ────────────────────────────────
+export const UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
+
+export const UPLOAD_ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/avif",
+] as const;
 
 // ── Cles des templates d'emails ─────────────────────────────
 export const EmailTemplateKeys = {
