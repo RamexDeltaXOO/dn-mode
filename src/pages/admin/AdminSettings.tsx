@@ -77,6 +77,7 @@ const EMPTY_FORM = {
   sendcloud_secret_key: "",
   sendcloud_sender_address_id: "",
   sendcloud_default_weight: "1",
+  sendcloud_packaging_weight: "100",
   // Stockage des images
   storage_endpoint: "",
   storage_region: "auto",
@@ -232,6 +233,11 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
                 <Field label="ID adresse d'expedition" value={form.sendcloud_sender_address_id} onChange={(v) => setForm({ ...form, sendcloud_sender_address_id: v })} placeholder="123456" />
                 <Field label="Poids par defaut (kg)" value={form.sendcloud_default_weight} onChange={(v) => setForm({ ...form, sendcloud_default_weight: v })} placeholder="1" />
               </div>
+              <Field label="Poids de l'emballage (g)" value={form.sendcloud_packaging_weight} onChange={(v) => setForm({ ...form, sendcloud_packaging_weight: v })} placeholder="100" />
+              <p className="text-[0.6875rem] text-[#999999]">
+                Le poids du colis est la somme des poids saisis sur les produits, plus l&apos;emballage.
+                Le poids par defaut ne s&apos;applique qu&apos;aux produits dont le poids n&apos;est pas renseigne.
+              </p>
               <div className="flex gap-2 flex-wrap items-center">
                 <button onClick={() => handleSave("sendcloud_public_key", form.sendcloud_public_key)} className="text-[0.625rem] uppercase tracking-[1px] border border-[#e0e0e0] px-3 py-1.5 hover:border-[#222222]">
                   {saved === "sendcloud_public_key" ? "OK" : "Enregistrer cle publique"}

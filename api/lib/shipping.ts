@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { ConfigKeys, Shipping, freeShippingBanner } from "@contracts/constants";
 import { getConfigNumber } from "./site-config";
+import { getWeightSettings, gramsToKg, methodAcceptsWeight } from "./weight";
 import { getDb } from "../queries/connection";
 import { shippingMethods } from "@db/schema";
 
@@ -13,21 +14,32 @@ export type ShippingSettings = {
   zone: string;
   /** Texte pret a afficher dans le bandeau. */
   banner: string;
+  /** Poids retenu pour un produit sans poids declare (grammes). */
+  fallbackWeightGrams: number;
+  /** Poids de l'emballage ajoute au colis (grammes). */
+  packagingWeightGrams: number;
 };
 
 /** Lit les reglages de livraison depuis le CRM (avec repli sur les constantes). */
 export async function getShippingSettings(): Promise<ShippingSettings> {
   const threshold = await getConfigNumber(ConfigKeys.shippingThreshold, Shipping.freeThreshold);
   const defaultCost = await getConfigNumber(ConfigKeys.shippingCost, Shipping.defaultCost);
+  const weights = await getWeightSettings();
   return {
     threshold,
     defaultCost,
     zone: Shipping.zone,
     banner: freeShippingBanner(threshold),
+    fallbackWeightGrams: weights.fallbackGrams,
+    packagingWeightGrams: weights.packagingGrams,
   };
 }
 
 export type ShippingQuote = {
+  /** Poids du colis retenu pour la cotation (kg), si connu. */
+  weightKg: number | null;
+  /** Vrai si la methode demandee ne couvre pas ce poids. */
+  weightOutOfRange: boolean;
   cost: number;
   free: boolean;
   threshold: number;
@@ -49,6 +61,8 @@ export type ShippingQuote = {
 export async function quoteShipping(input: {
   subtotal: number;
   methodId?: number | null;
+  /** Poids du colis en grammes, emballage compris. */
+  weightGrams?: number | null;
 }): Promise<ShippingQuote> {
   const settings = await getShippingSettings();
 
@@ -57,6 +71,12 @@ export async function quoteShipping(input: {
   let carrier: string | null = null;
   let requiresServicePoint = false;
   let methodId: number | null = null;
+  let weightOutOfRange = false;
+
+  const weightKg =
+    typeof input.weightGrams === "number" && input.weightGrams > 0
+      ? gramsToKg(input.weightGrams)
+      : null;
 
   if (input.methodId) {
     try {
@@ -72,6 +92,11 @@ export async function quoteShipping(input: {
         carrier = method.carrier;
         requiresServicePoint = Boolean(method.requiresServicePoint);
         methodId = method.id;
+        // Sendcloud decoupe les methodes par palier de poids : hors palier,
+        // le tarif affiche ne serait pas celui facture.
+        if (weightKg !== null && !methodAcceptsWeight(method, weightKg)) {
+          weightOutOfRange = true;
+        }
       }
     } catch {
       /* base indisponible : tarif par defaut */
@@ -81,6 +106,8 @@ export async function quoteShipping(input: {
   const free = input.subtotal >= settings.threshold;
 
   return {
+    weightKg,
+    weightOutOfRange,
     cost: free ? 0 : round2(price),
     free,
     threshold: settings.threshold,

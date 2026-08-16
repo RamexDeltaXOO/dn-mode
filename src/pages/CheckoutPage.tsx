@@ -140,10 +140,26 @@ export default function CheckoutPage() {
   const cartItems = cart?.items || [];
   const cartTotal = parseFloat(String(cart?.total || "0"));
 
+  // Reglages de poids du serveur, pour calculer ici exactement la meme valeur
+  // que celle qui servira a la cotation et a l'etiquette Sendcloud.
+  const { data: shippingSettings } = trpc.shipping.settings.useQuery();
+  const cartWeightGrams = useMemo(() => {
+    // On depend de cart?.items et non de cartItems : ce dernier est un nouveau
+    // tableau a chaque rendu, ce qui annulerait la memoisation.
+    const items = cart?.items ?? [];
+    if (!shippingSettings || items.length === 0) return 0;
+    const content = items.reduce((total, item) => {
+      const unit = item.product?.weightGrams ?? shippingSettings.fallbackWeightGrams;
+      return total + unit * item.quantity;
+    }, 0);
+    return content > 0 ? content + shippingSettings.packagingWeightGrams : 0;
+  }, [cart?.items, shippingSettings]);
+
   // Frais de port calcules par le backend (seuil de gratuite + tarif transporteur).
   const { data: quote } = trpc.shipping.quote.useQuery({
     subtotal: cartTotal,
     methodId: shippingMethod?.id,
+    weightGrams: cartWeightGrams,
   });
   const shippingCost = quote?.cost ?? 0;
   const finalTotal = cartTotal + shippingCost;
@@ -267,6 +283,7 @@ export default function CheckoutPage() {
                       setServicePoint(null);
                     }}
                     subtotal={cartTotal}
+                    weightGrams={cartWeightGrams}
                   />
                   {needsServicePoint && shippingMethod && (
                     <ServicePointPicker
@@ -338,6 +355,12 @@ export default function CheckoutPage() {
                 <span className="text-[#666666]">Livraison</span>
                 <span>{quote?.free ? "Offerte" : `€${shippingCost.toFixed(2)}`}</span>
               </div>
+              {cartWeightGrams > 0 && (
+                <div className="flex justify-between text-[0.6875rem] text-[#999999]">
+                  <span>Poids du colis</span>
+                  <span>{(cartWeightGrams / 1000).toFixed(2)} kg</span>
+                </div>
+              )}
               {quote && !quote.free && quote.remaining > 0 && (
                 <p className="text-[0.6875rem] text-[#999999]">
                   Plus que €{quote.remaining.toFixed(2)} pour la livraison offerte

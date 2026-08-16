@@ -10,6 +10,7 @@ import { getShippingSettings, quoteShipping } from "./lib/shipping";
 import { buildOrderItemsHtml, escapeHtml } from "./lib/email-templates";
 import { getSupportEmail, sendTemplateEmail } from "./lib/mailer";
 import { originFromRequest } from "./lib/request-origin";
+import { contentWeightGrams, getWeightSettings } from "./lib/weight";
 
 export type OrderEmailItem = {
   productName: string;
@@ -160,11 +161,22 @@ export const orderRouter = createRouter({
           totalPrice: itemTotal.toFixed(2),
           color: item.color || null,
           size: item.size || null,
+          weightGrams: product.weightGrams ?? null,
         });
       }
 
+      // Poids reel du panier : sert a choisir la bonne tranche tarifaire.
+      const weightSettings = await getWeightSettings();
+      const weightGrams =
+        contentWeightGrams(orderItemsData, weightSettings.fallbackGrams) +
+        weightSettings.packagingGrams;
+
       // Frais de port : livraison offerte au-dela du seuil configure (100€).
-      const quote = await quoteShipping({ subtotal, methodId: input.shippingMethodId ?? null });
+      const quote = await quoteShipping({
+        subtotal,
+        methodId: input.shippingMethodId ?? null,
+        weightGrams,
+      });
       const shippingCost = quote.cost;
       const discount = 0;
       const total = subtotal + shippingCost - discount;

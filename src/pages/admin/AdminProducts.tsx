@@ -12,6 +12,7 @@ interface ProductForm {
   images: string[];
   colors: string;
   sizes: string;
+  weightGrams: string;
   inventoryQuantity: string;
   collectionId: string;
   isActive: boolean;
@@ -27,6 +28,7 @@ const emptyForm: ProductForm = {
   images: [],
   colors: "",
   sizes: "",
+  weightGrams: "",
   inventoryQuantity: "0",
   collectionId: "",
   isActive: true,
@@ -86,6 +88,7 @@ export default function AdminProducts() {
       images: product.images || [],
       colors: (product.colors || []).join(","),
       sizes: (product.sizes || []).join(","),
+      weightGrams: product.weightGrams ? String(product.weightGrams) : "",
       inventoryQuantity: String(product.inventoryQuantity || 0),
       collectionId: product.collectionId ? String(product.collectionId) : "",
       isActive: product.isActive || false,
@@ -105,6 +108,7 @@ export default function AdminProducts() {
       images: form.images.filter((url) => url.trim() !== ""),
       colors: form.colors ? form.colors.split(",").map((s) => s.trim()) : [],
       sizes: form.sizes ? form.sizes.split(",").map((s) => s.trim()) : [],
+      weightGrams: form.weightGrams.trim() === "" ? null : parseInt(form.weightGrams, 10) || 0,
       inventoryQuantity: parseInt(form.inventoryQuantity) || 0,
       collectionId: form.collectionId ? parseInt(form.collectionId) : undefined,
       isActive: form.isActive,
@@ -201,6 +205,25 @@ export default function AdminProducts() {
                     className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222]"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">
+                  Poids (grammes)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="10"
+                  value={form.weightGrams}
+                  onChange={(e) => setForm({ ...form, weightGrams: e.target.value })}
+                  placeholder="350"
+                  className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222]"
+                />
+                <p className="text-[0.625rem] text-[#999999] mt-1">
+                  Poids d&apos;une piece, emballage exclu. Sert a choisir la tranche tarifaire du
+                  transporteur et a declarer le poids exact du colis a Sendcloud. Laisse vide pour
+                  utiliser le poids par defaut des Parametres.
+                </p>
               </div>
               <div>
                 <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Description</label>

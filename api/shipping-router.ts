@@ -4,12 +4,33 @@ import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { shippingMethods } from "@db/schema";
 import { getShippingSettings, quoteShipping } from "./lib/shipping";
+import { gramsToKg, methodAcceptsWeight } from "./lib/weight";
 
 export const shippingRouter = createRouter({
-  list: publicQuery.query(async () => {
-    const db = getDb();
-    return db.select().from(shippingMethods).where(eq(shippingMethods.isActive, true)).orderBy(shippingMethods.sortOrder);
-  }),
+  /**
+   * Methodes actives. Avec un poids fourni, on ne renvoie que les methodes
+   * dont la tranche couvre ce poids : c'est ce decoupage qui porte le tarif
+   * chez Sendcloud.
+   */
+  list: publicQuery
+    .input(z.object({ weightGrams: z.number().min(0).optional() }).optional())
+    .query(async ({ input }) => {
+      const db = getDb();
+      const methods = await db
+        .select()
+        .from(shippingMethods)
+        .where(eq(shippingMethods.isActive, true))
+        .orderBy(shippingMethods.sortOrder);
+
+      const grams = input?.weightGrams ?? 0;
+      if (grams <= 0) return methods;
+
+      const weightKg = gramsToKg(grams);
+      const applicable = methods.filter((m) => methodAcceptsWeight(m, weightKg));
+      // Ne jamais renvoyer une liste vide : mieux vaut proposer un tarif
+      // approximatif que bloquer le tunnel de commande.
+      return applicable.length > 0 ? applicable : methods;
+    }),
 
   listAll: adminQuery.query(async () => {
     const db = getDb();
@@ -26,9 +47,14 @@ export const shippingRouter = createRouter({
     .input(z.object({
       subtotal: z.number().min(0),
       methodId: z.number().optional(),
+      weightGrams: z.number().min(0).optional(),
     }))
     .query(async ({ input }) => {
-      return quoteShipping({ subtotal: input.subtotal, methodId: input.methodId ?? null });
+      return quoteShipping({
+        subtotal: input.subtotal,
+        methodId: input.methodId ?? null,
+        weightGrams: input.weightGrams ?? null,
+      });
     }),
 
   create: adminQuery

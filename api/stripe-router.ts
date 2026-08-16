@@ -5,6 +5,7 @@ import { payments, orders, orderItems, products, siteConfig } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { ConfigKeys, EmailTemplateKeys } from "@contracts/constants";
 import { quoteShipping } from "./lib/shipping";
+import { contentWeightGrams, getWeightSettings } from "./lib/weight";
 import { buildOrderEmailVariables } from "./order-router";
 import { sendTemplateEmail } from "./lib/mailer";
 
@@ -100,6 +101,7 @@ export const stripeRouter = createRouter({
         totalPrice: string;
         color: string | null;
         size: string | null;
+        weightGrams: number | null;
       }> = [];
 
       for (const item of input.items) {
@@ -119,11 +121,22 @@ export const stripeRouter = createRouter({
           totalPrice: itemTotal.toFixed(2),
           color: item.color || null,
           size: item.size || null,
+          weightGrams: product.weightGrams ?? null,
         });
       }
 
+      // Poids reel du panier, emballage compris.
+      const weightSettings = await getWeightSettings();
+      const weightGrams =
+        contentWeightGrams(orderItemsData, weightSettings.fallbackGrams) +
+        weightSettings.packagingGrams;
+
       // Livraison offerte au-dela du seuil configure (100€ par defaut).
-      const quote = await quoteShipping({ subtotal, methodId: input.shippingMethodId ?? null });
+      const quote = await quoteShipping({
+        subtotal,
+        methodId: input.shippingMethodId ?? null,
+        weightGrams,
+      });
       const shippingCost = quote.cost;
       const total = subtotal + shippingCost;
       const totalCents = Math.round(total * 100);

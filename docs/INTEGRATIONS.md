@@ -51,6 +51,27 @@ Les gabarits d'emails peuvent aussi etre crees depuis le CRM :
 Sans cles : methodes et points relais de demonstration, generation d'etiquette
 refusee avec un message explicite.
 
+## Poids des produits et tarif de livraison
+
+Chaque produit porte un **poids en grammes** (Admin > Produits > Poids), hors
+emballage. Le poids du colis vaut la somme des poids des articles commandes,
+plus le poids d'emballage configure dans **Parametres > Livraison Sendcloud**
+(100 g par defaut). Un produit sans poids retombe sur le poids par defaut.
+
+Ce poids sert a deux choses :
+
+1. **Choisir la bonne tranche tarifaire.** Sendcloud decoupe souvent un meme
+   transporteur en plusieurs methodes par palier de poids, et c'est ce palier
+   qui porte le prix. Le tunnel de commande ne propose que les methodes dont
+   la tranche couvre le poids du panier ; si aucune ne convient, toutes sont
+   affichees plutot que de bloquer la commande.
+2. **Declarer le poids exact du colis** a la creation de l'etiquette, ce qui
+   evite les regularisations de facturation du transporteur.
+
+Le poids est fige sur la ligne de commande au moment de l'achat, comme le
+prix : modifier ou supprimer un produit ensuite ne change pas les commandes
+passees.
+
 ## Connexion Gmail (Google OAuth 2.0)
 
 `Admin > Parametres > Connexion Gmail`

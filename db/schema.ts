@@ -70,6 +70,9 @@ export const products = mysqlTable("products", {
   colors: json("colors").$type<string[]>(),
   sizes: json("sizes").$type<string[]>(),
   sku: varchar("sku", { length: 100 }),
+  // Poids unitaire en grammes : entier, pour eviter tout arrondi flottant.
+  // Converti en kilos au moment de l'appel Sendcloud.
+  weightGrams: int("weight_grams"),
   inventoryQuantity: int("inventoryQuantity").default(0),
   categoryId: int("categoryId"),
   collectionId: int("collectionId"),
@@ -162,6 +165,9 @@ export const orderItems = mysqlTable("order_items", {
   totalPrice: decimal("totalPrice", { precision: 10, scale: 2 }).notNull(),
   color: varchar("color", { length: 50 }),
   size: varchar("size", { length: 50 }),
+  // Poids unitaire fige au moment de la commande, comme le prix : le produit
+  // peut changer ou disparaitre ensuite.
+  weightGrams: int("weight_grams"),
 });
 
 export type OrderItem = typeof orderItems.$inferSelect;

@@ -16,6 +16,8 @@ interface ShippingMethodSelectorProps {
   value: number | null;
   onChange: (method: ShippingMethodOption | null) => void;
   subtotal: number;
+  /** Poids du colis en grammes, emballage compris. */
+  weightGrams: number;
 }
 
 /** Liste des modes de livraison (Colissimo / Chronopost / Mondial Relay). */
@@ -23,8 +25,10 @@ export default function ShippingMethodSelector({
   value,
   onChange,
   subtotal,
+  weightGrams,
 }: ShippingMethodSelectorProps) {
-  const { data: methods, isLoading } = trpc.shipping.list.useQuery();
+  // Le serveur ne renvoie que les methodes dont la tranche couvre ce poids.
+  const { data: methods, isLoading } = trpc.shipping.list.useQuery({ weightGrams });
   const { data: settings } = trpc.shipping.settings.useQuery();
 
   const isFree = settings ? subtotal >= settings.threshold : false;

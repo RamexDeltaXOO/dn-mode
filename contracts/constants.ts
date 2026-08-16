@@ -48,6 +48,7 @@ export const ConfigKeys = {
   sendcloudSecretKey: "sendcloud_secret_key",
   sendcloudSenderAddressId: "sendcloud_sender_address_id",
   sendcloudDefaultWeight: "sendcloud_default_weight",
+  sendcloudPackagingWeight: "sendcloud_packaging_weight",
 
   googleClientId: "gmail_client_id",
   googleClientSecret: "gmail_client_secret",
@@ -90,6 +91,13 @@ export function carrierLabel(code: string): string {
 export function carrierNeedsServicePoint(code: string): boolean {
   return CARRIER_LIST.find((c) => c.code === code)?.servicePoint ?? false;
 }
+
+// ── Poids ───────────────────────────────────────────────────
+/** Poids unitaire retenu quand un produit n'en declare pas (grammes). */
+export const DEFAULT_PRODUCT_WEIGHT_G = 500;
+
+/** Poids de l'emballage ajoute au colis (grammes). */
+export const DEFAULT_PACKAGING_WEIGHT_G = 100;
 
 // ── Upload d'images produits ────────────────────────────────
 export const UPLOAD_MAX_BYTES = 8 * 1024 * 1024;

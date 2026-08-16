@@ -2,8 +2,9 @@ import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { orders, shippingMethods } from "@db/schema";
+import { orders, orderItems, shippingMethods } from "@db/schema";
 import { carrierLabel } from "@contracts/constants";
+import { gramsToKg, parcelWeightGrams } from "./lib/weight";
 import {
   createParcel,
   demoPriceFor,
@@ -190,6 +191,12 @@ export const sendcloudRouter = createRouter({
         };
       }
 
+      // Poids reel : somme des poids figes sur les lignes + emballage.
+      // On ne retombe sur le poids par defaut que si l'entree l'impose.
+      const lines = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+      const computedGrams = await parcelWeightGrams(lines);
+      const weightKg = input.weight ?? gramsToKg(computedGrams);
+
       const result = await createParcel({
         name: [order.firstName, order.lastName].filter(Boolean).join(" ") || order.email,
         address: order.address || "",
@@ -199,7 +206,7 @@ export const sendcloudRouter = createRouter({
         email: order.email,
         telephone: order.phone || "",
         orderNumber: order.orderNumber,
-        weight: input.weight ?? creds.defaultWeight,
+        weight: weightKg,
         shippingMethodId: sendcloudMethodId,
         servicePointId: order.servicePointId,
       });
