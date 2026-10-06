@@ -96,7 +96,7 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
             <img
               src="/logo-dnmode.png"
               alt="DN MODE"
-              className={`h-11 sm:h-[52px] w-auto transition-[filter] duration-300 ${
+              className={`h-14 sm:h-[52px] w-auto transition-[filter] duration-300 ${
                 overHero
                   ? "brightness-0 invert"
                   : scrolled
