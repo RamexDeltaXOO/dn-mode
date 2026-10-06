@@ -7,6 +7,7 @@ import { createContext } from "./context";
 import { env } from "./lib/env";
 import { createGoogleCallbackHandler } from "./lib/google-oauth";
 import { createUploadHandler } from "./lib/storage";
+import { ensureSchema } from "./lib/ensure-schema";
 import { Paths } from "@contracts/constants";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
@@ -22,6 +23,11 @@ app.use("/api/trpc/*", async (c) => {
     req: c.req.raw,
     router: appRouter,
     createContext,
+    onError({ path, error }) {
+      if (error.code === "INTERNAL_SERVER_ERROR") {
+        console.error(`[trpc] ${path ?? "?"} :`, error.cause ?? error);
+      }
+    },
   });
 });
 app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
@@ -32,6 +38,9 @@ if (env.isProduction) {
   const { serve } = await import("@hono/node-server");
   const { serveStaticFiles } = await import("./lib/vite");
   serveStaticFiles(app);
+
+  // Sans attendre : une base lente ne doit pas retarder le demarrage.
+  ensureSchema().catch((err) => console.error("[schema]", err));
 
   const port = parseInt(process.env.PORT || "3000");
   serve({ fetch: app.fetch, port }, () => {

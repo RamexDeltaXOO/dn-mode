@@ -1,8 +1,24 @@
 import { z } from "zod";
-import { eq, like, and, sql } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
+import { eq, ne, like, and, sql } from "drizzle-orm";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { products } from "@db/schema";
+
+/** Refuse un slug deja pris, avec un message clair plutot qu'une erreur MySQL. */
+async function assertSlugAvailable(slug: string, exceptId?: number): Promise<void> {
+  const db = getDb();
+  const condition = exceptId === undefined
+    ? eq(products.slug, slug)
+    : and(eq(products.slug, slug), ne(products.id, exceptId));
+  const [existing] = await db.select({ id: products.id, name: products.name }).from(products).where(condition);
+  if (existing) {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: `Le slug « ${slug} » est deja utilise par le produit « ${existing.name} ». Choisissez-en un autre.`,
+    });
+  }
+}
 
 export const productRouter = createRouter({
   list: publicQuery
@@ -105,6 +121,7 @@ export const productRouter = createRouter({
       isFeatured: z.boolean().optional(),
     }))
     .mutation(async ({ input }) => {
+      await assertSlugAvailable(input.slug);
       const db = getDb();
       const data = {
         ...input,
@@ -136,6 +153,7 @@ export const productRouter = createRouter({
       isFeatured: z.boolean().optional(),
     }))
     .mutation(async ({ input }) => {
+      if (input.slug !== undefined) await assertSlugAvailable(input.slug, input.id);
       const db = getDb();
       const { id, ...raw } = input;
       const data: Record<string, unknown> = { ...raw };

@@ -72,12 +72,16 @@ export default function AdminProducts() {
     : products;
 
   const openCreate = () => {
+    createProduct.reset();
+    updateProduct.reset();
     setEditingId(null);
     setForm(emptyForm);
     setShowForm(true);
   };
 
   const openEdit = (product: (typeof products)[0]) => {
+    createProduct.reset();
+    updateProduct.reset();
     setEditingId(product.id);
     setForm({
       name: product.name,
@@ -305,6 +309,11 @@ export default function AdminProducts() {
                     ? "Mettre a jour"
                     : "Creer"}
                 </button>
+                {(createProduct.error || updateProduct.error) && (
+                  <p className="text-[0.75rem] text-red-600 mt-2">
+                    {(createProduct.error || updateProduct.error)?.message}
+                  </p>
+                )}
               </div>
             </form>
           </div>

@@ -2,9 +2,16 @@ import { ErrorMessages } from "@contracts/constants";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
+import { describeDbError } from "./lib/db-errors";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
+  errorFormatter({ shape, error }) {
+    if (error.code !== "INTERNAL_SERVER_ERROR") return shape;
+    // Remplace « Failed query: ... params: ... » par la vraie raison MySQL.
+    const message = describeDbError(error.cause ?? error);
+    return message ? { ...shape, message } : shape;
+  },
 });
 
 export const createRouter = t.router;
