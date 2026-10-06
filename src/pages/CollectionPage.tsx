@@ -8,7 +8,6 @@ export default function CollectionPage() {
   const gridRef = useRef<HTMLDivElement>(null);
 
   const { data: collections } = trpc.collection.list.useQuery();
-  const { data: categories } = trpc.category.list.useQuery();
 
   // Get current collection from slug
   const currentCollection = collections?.find(c => c.slug === slug);
@@ -62,20 +61,6 @@ export default function CollectionPage() {
               ))}
             </nav>
 
-            <h2 className="text-[0.6875rem] uppercase tracking-[2px] text-[#999999] mb-4 mt-8">Categories</h2>
-            <nav className="space-y-0">
-              {categories?.map((category) => (
-                <Link
-                  key={category.id}
-                  to={`/collections/${category.slug}`}
-                  className={`block py-2 text-[0.8125rem] transition-colors ${
-                    slug === category.slug ? "text-[#222222] font-medium" : "text-[#666666] hover:text-[#222222]"
-                  }`}
-                >
-                  {category.name}
-                </Link>
-              ))}
-            </nav>
           </aside>
 
           {/* Products */}

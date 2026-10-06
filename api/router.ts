@@ -2,7 +2,6 @@ import { localAuthRouter } from "./local-auth-router";
 import { googleAuthRouter } from "./google-auth-router";
 import { productRouter } from "./product-router";
 import { collectionRouter } from "./collection-router";
-import { categoryRouter } from "./category-router";
 import { cartRouter } from "./cart-router";
 import { orderRouter } from "./order-router";
 import { contactRouter } from "./contact-router";
@@ -24,7 +23,6 @@ export const appRouter = createRouter({
   googleAuth: googleAuthRouter,
   product: productRouter,
   collection: collectionRouter,
-  category: categoryRouter,
   cart: cartRouter,
   order: orderRouter,
   contact: contactRouter,

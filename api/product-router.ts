@@ -25,7 +25,6 @@ export const productRouter = createRouter({
     .input(
       z.object({
         collectionId: z.number().optional(),
-        categoryId: z.number().optional(),
         featured: z.boolean().optional(),
         search: z.string().optional(),
         page: z.number().min(1).default(1),
@@ -46,9 +45,6 @@ export const productRouter = createRouter({
 
         if (input.collectionId) {
           filters.push(eq(products.collectionId, input.collectionId));
-        }
-        if (input.categoryId) {
-          filters.push(eq(products.categoryId, input.categoryId));
         }
         if (input.featured) {
           filters.push(eq(products.isFeatured, true));
@@ -115,7 +111,6 @@ export const productRouter = createRouter({
       sku: z.string().optional(),
       weightGrams: z.number().int().min(0).optional().nullable(),
       inventoryQuantity: z.number().optional(),
-      categoryId: z.number().optional(),
       collectionId: z.number().optional(),
       isActive: z.boolean().optional(),
       isFeatured: z.boolean().optional(),
@@ -147,7 +142,6 @@ export const productRouter = createRouter({
       sku: z.string().optional(),
       weightGrams: z.number().int().min(0).optional().nullable(),
       inventoryQuantity: z.number().optional(),
-      categoryId: z.number().optional(),
       collectionId: z.number().optional(),
       isActive: z.boolean().optional(),
       isFeatured: z.boolean().optional(),

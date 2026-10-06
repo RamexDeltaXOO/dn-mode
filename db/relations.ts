@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { users, collections, categories, products, carts, cartItems, orders, orderItems } from "./schema";
+import { users, collections, products, carts, cartItems, orders, orderItems } from "./schema";
 
 export const usersRelations = relations(users, ({ many }) => ({
   orders: many(orders),
@@ -10,14 +10,8 @@ export const collectionsRelations = relations(collections, ({ many }) => ({
   products: many(products),
 }));
 
-export const categoriesRelations = relations(categories, ({ many, one }) => ({
-  products: many(products),
-  parent: one(categories, { fields: [categories.parentId], references: [categories.id] }),
-}));
-
 export const productsRelations = relations(products, ({ one }) => ({
   collection: one(collections, { fields: [products.collectionId], references: [collections.id] }),
-  category: one(categories, { fields: [products.categoryId], references: [categories.id] }),
 }));
 
 export const cartsRelations = relations(carts, ({ many, one }) => ({

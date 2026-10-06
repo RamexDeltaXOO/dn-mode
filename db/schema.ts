@@ -46,17 +46,6 @@ export const collections = mysqlTable("collections", {
 
 export type Collection = typeof collections.$inferSelect;
 
-// ── Categories ──────────────────────────────────────────────
-export const categories = mysqlTable("categories", {
-  id: int("id").autoincrement().primaryKey(),
-  name: varchar("name", { length: 255 }).notNull(),
-  slug: varchar("slug", { length: 255 }).notNull().unique(),
-  parentId: int("parentId"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
-
-export type Category = typeof categories.$inferSelect;
-
 // ── Products ────────────────────────────────────────────────
 export const products = mysqlTable("products", {
   id: int("id").autoincrement().primaryKey(),
@@ -74,7 +63,6 @@ export const products = mysqlTable("products", {
   // Converti en kilos au moment de l'appel Sendcloud.
   weightGrams: int("weight_grams"),
   inventoryQuantity: int("inventoryQuantity").default(0),
-  categoryId: int("categoryId"),
   collectionId: int("collectionId"),
   isActive: boolean("isActive").default(true),
   isFeatured: boolean("isFeatured").default(false),

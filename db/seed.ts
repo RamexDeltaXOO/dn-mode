@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../api/queries/connection";
 import { ensureDefaultTemplates } from "../api/lib/email-templates";
 import { Shipping } from "../contracts/constants";
-import { collections, categories, products, shippingMethods, siteConfig } from "./schema";
+import { collections, products, shippingMethods, siteConfig } from "./schema";
 
 async function seed() {
   const db = getDb();
@@ -31,26 +31,6 @@ async function seed() {
   }
   console.log("Collections seeded");
 
-  // ── Categories ───────────────────────────────────────────
-  const categoryData = [
-    { name: "Robes longues", slug: "robes-longues" },
-    { name: "Robes midi", slug: "robes-midi" },
-    { name: "Ensembles", slug: "ensembles-cat" },
-    { name: "Jupes longues", slug: "jupes-longues" },
-    { name: "Tops", slug: "tops" },
-    { name: "Hijabs jersey", slug: "hijabs-jersey" },
-    { name: "Manteaux", slug: "manteaux-cat" },
-    { name: "Cardigans", slug: "cardigans" },
-  ];
-
-  for (const c of categoryData) {
-    const existing = await db.select().from(categories).where(eq(categories.slug, c.slug));
-    if (existing.length === 0) {
-      await db.insert(categories).values(c);
-    }
-  }
-  console.log("Categories seeded");
-
   // ── Products ─────────────────────────────────────────────
   const productData = [
     {
@@ -65,7 +45,6 @@ async function seed() {
       sku: "ENS-QMR-001",
       inventoryQuantity: 5,
       collectionId: 7,
-      categoryId: 3,
       isActive: true,
       isFeatured: true,
     },
@@ -81,7 +60,6 @@ async function seed() {
       sku: "ENS-SHA-002",
       inventoryQuantity: 0,
       collectionId: 7,
-      categoryId: 3,
       isActive: true,
       isFeatured: true,
     },
@@ -97,7 +75,6 @@ async function seed() {
       sku: "ENS-VCH-003",
       inventoryQuantity: 3,
       collectionId: 7,
-      categoryId: 3,
       isActive: true,
       isFeatured: true,
     },
@@ -113,7 +90,6 @@ async function seed() {
       sku: "JUP-SDE-004",
       inventoryQuantity: 12,
       collectionId: 6,
-      categoryId: 4,
       isActive: true,
       isFeatured: true,
     },
@@ -129,7 +105,6 @@ async function seed() {
       sku: "ROB-AMN-005",
       inventoryQuantity: 8,
       collectionId: 4,
-      categoryId: 1,
       isActive: true,
       isFeatured: false,
     },
@@ -145,7 +120,6 @@ async function seed() {
       sku: "ROB-LYL-006",
       inventoryQuantity: 6,
       collectionId: 4,
-      categoryId: 1,
       isActive: true,
       isFeatured: false,
     },
@@ -162,7 +136,6 @@ async function seed() {
       sku: "ENS-PLZ-007",
       inventoryQuantity: 0,
       collectionId: 7,
-      categoryId: 3,
       isActive: true,
       isFeatured: false,
     },
@@ -178,7 +151,6 @@ async function seed() {
       sku: "ENS-HYM-008",
       inventoryQuantity: 4,
       collectionId: 7,
-      categoryId: 3,
       isActive: true,
       isFeatured: false,
     },
@@ -194,7 +166,6 @@ async function seed() {
       sku: "ROB-RSP-009",
       inventoryQuantity: 7,
       collectionId: 4,
-      categoryId: 1,
       isActive: true,
       isFeatured: false,
     },
@@ -210,7 +181,6 @@ async function seed() {
       sku: "HIJ-JRY-010",
       inventoryQuantity: 25,
       collectionId: 10,
-      categoryId: 6,
       isActive: true,
       isFeatured: false,
     },
@@ -226,7 +196,6 @@ async function seed() {
       sku: "ENS-CHP-011",
       inventoryQuantity: 9,
       collectionId: 2,
-      categoryId: 5,
       isActive: true,
       isFeatured: false,
     },
@@ -242,7 +211,6 @@ async function seed() {
       sku: "CAR-CHL-012",
       inventoryQuantity: 10,
       collectionId: 8,
-      categoryId: 8,
       isActive: true,
       isFeatured: false,
     },
@@ -258,7 +226,6 @@ async function seed() {
       sku: "ENS-VSA-013",
       inventoryQuantity: 6,
       collectionId: 7,
-      categoryId: 3,
       isActive: true,
       isFeatured: false,
     },
@@ -274,7 +241,6 @@ async function seed() {
       sku: "ROB-ABY-014",
       inventoryQuantity: 8,
       collectionId: 4,
-      categoryId: 1,
       isActive: true,
       isFeatured: false,
     },

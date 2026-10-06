@@ -10,7 +10,6 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminProducts from "./pages/admin/AdminProducts";
 import AdminCollections from "./pages/admin/AdminCollections";
-import AdminCategories from "./pages/admin/AdminCategories";
 import AdminOrders from "./pages/admin/AdminOrders";
 import AdminShipping from "./pages/admin/AdminShipping";
 import AdminMessages from "./pages/admin/AdminMessages";
@@ -45,7 +44,6 @@ function App() {
         <Route path="analytics" element={<AdminAnalytics />} />
         <Route path="products" element={<AdminProducts />} />
         <Route path="collections" element={<AdminCollections />} />
-        <Route path="categories" element={<AdminCategories />} />
         <Route path="orders" element={<AdminOrders />} />
         <Route path="shipping" element={<AdminShipping />} />
         <Route path="messages" element={<AdminMessages />} />

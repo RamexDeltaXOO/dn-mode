@@ -281,7 +281,15 @@ Chaque `git push` sur `main` declenche un rollout. En cas de probleme, la
 console App Hosting permet de revenir a une version precedente en un clic.
 
 Si tu modifies `db/schema.ts`, relancer `npm run db:push` sur la base de
-production, ce n'est pas automatique.
+production, ce n'est pas automatique. Seule exception : les colonnes listees
+dans `api/lib/ensure-schema.ts` (aujourd'hui `weight_grams` sur `products` et
+`order_items`) sont ajoutees par le serveur lui-meme au demarrage s'il en
+manque une. Ce mecanisme ne fait que des ajouts, jamais de suppression.
+
+Les categories ont ete retirees du projet au profit des seules collections. La
+table `categories` et la colonne `products.categoryId` restent en base sans
+etre utilisees ; un prochain `db:push` proposera de les supprimer, ce qui est
+sans risque.
 
 ## Points a traiter plus tard
 
