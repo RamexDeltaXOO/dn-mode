@@ -178,6 +178,10 @@ Se connecter sur `https://<ton-url>/login` avec le compte admin, puis ouvrir
 **Site web** : nom, email de contact, seuil de livraison offerte (100€ par
 defaut, France metropolitaine).
 
+**Page d'accueil** : image du bandeau principal et image « Look du moment ».
+Envoyer un fichier (le stockage des images doit etre configure) ou coller une
+URL. Sans choix, les images livrees avec le site s'affichent.
+
 **Paiement Stripe** : cles depuis le tableau de bord Stripe. Commencer en mode
 test (`pk_test_` / `sk_test_`), basculer en `pk_live_` / `sk_live_` une fois la
 premiere commande validee. Cle vide = paiement simule.
