@@ -90,7 +90,7 @@ export default function Footer() {
               ))}
             </div>
             <p className="text-[0.6875rem] text-[#aaaaaa] mt-4 font-light">
-              WEBSITE DESIGN BY CREA MG
+              WEBSITE DESIGN BY RAMEXA
             </p>
           </div>
         </div>

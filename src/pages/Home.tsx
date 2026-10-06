@@ -106,13 +106,11 @@ export default function Home() {
             <img src="/logo-dnmode.png" alt="DN MODE" className="h-10 mx-auto" />
           </div>
           <p className="animate-in opacity-0 translate-y-5 text-[0.9375rem] text-[#666666] leading-[1.6]">
-            Exprimer votre{" "}
-            <em className="font-['Playfair_Display'] italic">style</em> avec{" "}
-            <em className="font-['Playfair_Display'] italic">elegance</em> et{" "}
-            <em className="font-['Playfair_Display'] italic">pudeur</em> a travers nos{" "}
+            Fais de ton{" "}
+            <em className="font-['Playfair_Display'] italic">style</em> ton{" "}
+            <em className="font-['Playfair_Display'] italic">atout</em> a travers nos{" "}
             <em className="font-['Playfair_Display'] italic">collections</em> qui respectent vos{" "}
-            <em className="font-['Playfair_Display'] italic">valeurs</em> et votre{" "}
-            <em className="font-['Playfair_Display'] italic">foi</em>.
+            <em className="font-['Playfair_Display'] italic">valeurs</em>.
           </p>
           <p className="animate-in opacity-0 translate-y-5 text-[0.8125rem] text-[#999999] tracking-[3px] uppercase mt-8">
             Production <strong className="text-[#222222] font-medium">Ethique</strong>
