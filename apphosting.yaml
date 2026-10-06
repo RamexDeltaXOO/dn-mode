@@ -1,4 +1,4 @@
-# Firebase App Hosting — deploiement du serveur Hono (API tRPC + SPA).
+# Firebase App Hosting : deploiement du serveur Hono (API tRPC + SPA).
 # L'app tourne dans une revision Cloud Run : App Hosting build depuis GitHub,
 # puis lance runCommand. Le CDN est place devant automatiquement.
 

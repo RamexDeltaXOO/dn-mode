@@ -37,7 +37,7 @@ export const sendcloudRouter = createRouter({
     if (!creds.configured) {
       return {
         ok: false,
-        message: "Cles API manquantes — mode demo actif.",
+        message: "Cles API manquantes : mode demo actif.",
       };
     }
     const account = await getAccount();
@@ -102,7 +102,7 @@ export const sendcloudRouter = createRouter({
     return { imported, updated, source, message };
   }),
 
-  /** Recherche de points relais — appele depuis le tunnel de commande. */
+  /** Recherche de points relais, appelee depuis le tunnel de commande. */
   servicePoints: publicQuery
     .input(
       z.object({
@@ -146,7 +146,7 @@ export const sendcloudRouter = createRouter({
         return {
           ok: false,
           message:
-            "Sendcloud n'est pas configure — renseignez vos cles API dans Parametres.",
+            "Sendcloud n'est pas configure. Renseignez vos cles API dans Parametres.",
           parcelId: null,
           trackingNumber: null,
           trackingUrl: null,

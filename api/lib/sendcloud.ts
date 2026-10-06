@@ -485,7 +485,7 @@ export async function createParcel(input: {
     return {
       ok: false,
       message:
-        "Sendcloud n'est pas configure — renseignez vos cles API dans Parametres > Livraison Sendcloud.",
+        "Sendcloud n'est pas configure. Renseignez vos cles API dans Parametres > Livraison Sendcloud.",
       parcelId: null,
       trackingNumber: null,
       trackingUrl: null,

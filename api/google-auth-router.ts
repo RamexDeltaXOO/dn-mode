@@ -26,7 +26,7 @@ export const googleAuthRouter = createRouter({
       if (!creds.enabled) return { url: null };
 
       // L'URI envoyee ici doit etre identique, au caractere pres, a celle que
-      // le callback reconstruira — d'ou la source commune originFromRequest.
+      // le callback reconstruira, d'ou la source commune originFromRequest.
       return {
         url: buildAuthUrl({
           clientId: creds.clientId,

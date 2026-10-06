@@ -88,8 +88,8 @@ export default function ShippingMethodSelector({
               <span className="block text-[0.8125rem] text-[#222222]">{option.name}</span>
               <span className="block text-[0.6875rem] text-[#999999] uppercase tracking-[1px]">
                 {carrierLabel(option.carrier)}
-                {option.estimatedDays ? ` — ${option.estimatedDays}` : ""}
-                {option.requiresServicePoint ? " — Point relais" : ""}
+                {option.estimatedDays ? ` · ${option.estimatedDays}` : ""}
+                {option.requiresServicePoint ? " · Point relais" : ""}
               </span>
             </span>
             <span className="text-[0.8125rem] whitespace-nowrap">

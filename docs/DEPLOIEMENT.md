@@ -1,4 +1,4 @@
-# Mettre DN MODE en ligne — guide de A a Z
+# Mettre DN MODE en ligne : guide de A a Z
 
 Cible : **Firebase App Hosting** (le serveur Hono tourne dans Cloud Run, le CDN
 est place devant). Compter environ 1 h la premiere fois.
@@ -9,7 +9,7 @@ domaine connu.
 
 ---
 
-## Etape 0 — Prerequis
+## Etape 0 : Prerequis
 
 Outils en local :
 
@@ -35,7 +35,7 @@ de demonstration, et page de connexion sans bouton Google.
 
 ---
 
-## Etape 1 — Creer le projet Firebase
+## Etape 1 : Creer le projet Firebase
 
 1. [console.firebase.google.com](https://console.firebase.google.com) > **Ajouter un projet**.
 2. Activer la facturation (plan **Blaze**) : App Hosting l'exige.
@@ -43,11 +43,11 @@ de demonstration, et page de connexion sans bouton Google.
 
 ---
 
-## Etape 2 — La base MySQL
+## Etape 2 : La base MySQL
 
 Deux chemins. Choisir **un seul**.
 
-### Option A — MySQL managé externe (le plus simple)
+### Option A : MySQL managé externe (le plus simple)
 
 Scaleway, OVH, Aiven, o2switch... N'importe quel MySQL 8 joignable en TCP avec
 TLS. Recuperer une chaine de la forme :
@@ -58,7 +58,7 @@ mysql://utilisateur:motdepasse@hote:3306/dnmode?ssl={"rejectUnauthorized":true}
 
 Rien d'autre a configurer : `apphosting.yaml` est deja pret.
 
-### Option B — Cloud SQL for MySQL (tout dans GCP)
+### Option B : Cloud SQL for MySQL (tout dans GCP)
 
 Coherent si tu veux une seule facture et un reseau prive.
 
@@ -92,7 +92,7 @@ cloud-sql-proxy PROJET:REGION:INSTANCE --port 3307
 
 ---
 
-## Etape 3 — Creer le backend App Hosting
+## Etape 3 : Creer le backend App Hosting
 
 Console Firebase > **App Hosting** > **Creer un backend** :
 
@@ -106,12 +106,12 @@ Firebase detecte `apphosting.yaml` et lance un premier deploiement, qui va
 
 ---
 
-## Etape 4 — Les deux secrets obligatoires
+## Etape 4 : Les deux secrets obligatoires
 
 Sans eux le conteneur refuse de demarrer (`api/lib/env.ts`).
 
 ```bash
-# 1. Secret de signature des sessions — generer une valeur aleatoire longue
+# 1. Secret de signature des sessions : generer une valeur aleatoire longue
 openssl rand -base64 48
 
 firebase apphosting:secrets:set appSecret
@@ -138,7 +138,7 @@ Relancer ensuite un deploiement (bouton **Deployer** dans la console, ou un
 
 ---
 
-## Etape 5 — Initialiser la base
+## Etape 5 : Initialiser la base
 
 Depuis ton poste, en pointant sur la base de **production** :
 
@@ -146,7 +146,7 @@ Depuis ton poste, en pointant sur la base de **production** :
 git clone https://github.com/RamexDeltaXOO/dn-mode.git && cd dn-mode
 npm ci
 
-# .env local, uniquement pour ces commandes — ne jamais le commiter
+# .env local, uniquement pour ces commandes (ne jamais le commiter)
 cat > .env <<'EOF'
 DATABASE_URL=mysql://utilisateur:motdepasse@hote:3306/dnmode
 APP_SECRET=peu-importe-ici
@@ -170,29 +170,29 @@ Supprimer le `.env` ensuite : `rm .env`.
 
 ---
 
-## Etape 6 — Renseigner les cles dans le CRM
+## Etape 6 : Renseigner les cles dans le CRM
 
 Se connecter sur `https://<ton-url>/login` avec le compte admin, puis ouvrir
 **Admin > Parametres**. Tout se saisit ici, rien a redeployer.
 
-**Site web** — nom, email de contact, seuil de livraison offerte (100€ par
+**Site web** : nom, email de contact, seuil de livraison offerte (100€ par
 defaut, France metropolitaine).
 
-**Paiement Stripe** — cles depuis le tableau de bord Stripe. Commencer en mode
+**Paiement Stripe** : cles depuis le tableau de bord Stripe. Commencer en mode
 test (`pk_test_` / `sk_test_`), basculer en `pk_live_` / `sk_live_` une fois la
 premiere commande validee. Cle vide = paiement simule.
 
-**Livraison Sendcloud** — cle publique + cle secrete, puis **Tester la
+**Livraison Sendcloud** : cle publique + cle secrete, puis **Tester la
 connexion**. Ensuite **Admin > Livraison > Synchroniser depuis Sendcloud** pour
 importer les methodes Colissimo / Chronopost / Mondial Relay.
 
-**Emails transactionnels** — cle Resend, email expediteur, email SAV. Le domaine
+**Emails transactionnels** : cle Resend, email expediteur, email SAV. Le domaine
 d'envoi doit etre verifie chez Resend (enregistrements DNS SPF/DKIM), sinon les
 emails partent en spam. Puis **Creer les templates par defaut**.
 
 ---
 
-## Etape 7 — Connexion Gmail (optionnel)
+## Etape 7 : Connexion Gmail (optionnel)
 
 1. Console GCP > **API et services** > **Identifiants** > Creer des
    identifiants > **ID client OAuth** > Application Web.
@@ -213,7 +213,7 @@ pas duplique.
 
 ---
 
-## Etape 8 — Domaine personnalise
+## Etape 8 : Domaine personnalise
 
 Console Firebase > App Hosting > ton backend > **Domaines personnalises**,
 ajouter `dnmode.fr`, puis creer les enregistrements DNS indiques chez ton
@@ -227,7 +227,7 @@ Ensuite, deux choses a reprendre :
 
 ---
 
-## Etape 9 — Verification avant ouverture
+## Etape 9 : Verification avant ouverture
 
 - [ ] La page d'accueil s'affiche, bandeau « Livraison offerte a partir de 100€ »
       qui defile sur mobile
@@ -277,7 +277,7 @@ Chaque `git push` sur `main` declenche un rollout. En cas de probleme, la
 console App Hosting permet de revenir a une version precedente en un clic.
 
 Si tu modifies `db/schema.ts`, relancer `npm run db:push` sur la base de
-production — ce n'est pas automatique.
+production, ce n'est pas automatique.
 
 ## Points a traiter plus tard
 

@@ -21,11 +21,11 @@ export const Shipping = {
   freeThreshold: 100,
   defaultCost: 5.9,
   zone: "France metropolitaine",
-  bannerText: "Livraison offerte a partir de 100€ — En France metropolitaine",
+  bannerText: "Livraison offerte a partir de 100€ en France metropolitaine",
 } as const;
 
 export function freeShippingBanner(threshold: number = Shipping.freeThreshold): string {
-  return `Livraison offerte a partir de ${threshold}€ — En ${Shipping.zone}`;
+  return `Livraison offerte a partir de ${threshold}€ en ${Shipping.zone}`;
 }
 
 // ── Cles de configuration (table site_config, editables via le CRM) ──

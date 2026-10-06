@@ -76,7 +76,7 @@ function CheckoutForm({ clientSecret, orderId, orderNumber, total, carrierName, 
         )}
         {servicePoint && (
           <p className="text-[0.8125rem] text-[#666666]">
-            Point relais : {servicePoint.name} — {servicePoint.address}
+            Point relais : {servicePoint.name}, {servicePoint.address}
           </p>
         )}
         <p className="text-[0.8125rem] text-[#999999] mt-2 mb-6">Un email de confirmation a ete envoye.</p>
@@ -316,7 +316,7 @@ export default function CheckoutPage() {
                   total={paymentData.total}
                   carrierName={
                     shippingMethod
-                      ? `${carrierLabel(shippingMethod.carrier)} — ${shippingMethod.name}`
+                      ? `${carrierLabel(shippingMethod.carrier)} · ${shippingMethod.name}`
                       : null
                   }
                   servicePoint={servicePoint}

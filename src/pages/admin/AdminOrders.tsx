@@ -193,7 +193,7 @@ export default function AdminOrders() {
                               <p className="text-[0.75rem] text-[#666666] mt-2 flex items-center gap-1">
                                 <Package size={12} className="text-[#999999]" />
                                 {carrierLabel(orderDetail.shippingCarrier)}
-                                {orderDetail.shippingMethodName ? ` — ${orderDetail.shippingMethodName}` : ""}
+                                {orderDetail.shippingMethodName ? ` · ${orderDetail.shippingMethodName}` : ""}
                               </p>
                             )}
 

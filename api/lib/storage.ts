@@ -99,7 +99,7 @@ export async function uploadImage(input: {
       ok: false,
       status: 503,
       error:
-        "Stockage non configure — renseignez vos identifiants dans Parametres > Stockage des images.",
+        "Stockage non configure. Renseignez vos identifiants dans Parametres > Stockage des images.",
     };
   }
 
@@ -174,7 +174,7 @@ async function requireAdmin(headers: Headers): Promise<boolean> {
 }
 
 /**
- * Route Hono POST /api/upload — multipart/form-data, champ `file`.
+ * Route Hono POST /api/upload (multipart/form-data, champ `file`).
  * L'upload ne passe pas par tRPC, qui ne transporte pas de binaire.
  */
 export function createUploadHandler() {

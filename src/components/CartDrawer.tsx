@@ -135,7 +135,7 @@ export default function CartDrawer({ open, onClose }: CartDrawerProps) {
                 {missingForFreeShipping > 0 ? (
                   <div className="mb-4">
                     <p className="text-[0.6875rem] text-[#999999]">
-                      Livraison offerte a partir de {threshold}€ — En {Shipping.zone}
+                      Livraison offerte a partir de {threshold}€ en {Shipping.zone}
                     </p>
                     <p className="text-[0.6875rem] text-[#666666] mt-0.5">
                       Plus que €{missingForFreeShipping.toFixed(2)} pour la livraison offerte

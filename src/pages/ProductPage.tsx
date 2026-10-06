@@ -193,7 +193,7 @@ export default function ProductPage() {
             <div className="mt-4 space-y-1">
               <p className="text-[0.75rem] text-[#666666]">Expedition sous 2-3 jours ouvres</p>
               <p className="text-[0.75rem] text-[#666666]">
-                Livraison offerte a partir de {freeShippingThreshold}€ — En {Shipping.zone}
+                Livraison offerte a partir de {freeShippingThreshold}€ en {Shipping.zone}
               </p>
             </div>
 

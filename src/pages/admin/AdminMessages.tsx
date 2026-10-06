@@ -233,7 +233,7 @@ export default function AdminMessages() {
                   <p className="text-[0.75rem] text-[#999999] uppercase tracking-[1px] mb-2">
                     Reponse envoyee
                     {selected.repliedAt
-                      ? ` — ${new Date(selected.repliedAt).toLocaleDateString("fr-FR")}`
+                      ? ` le ${new Date(selected.repliedAt).toLocaleDateString("fr-FR")}`
                       : ""}
                   </p>
                   <p className="text-[0.875rem] text-[#666666] leading-[1.6] whitespace-pre-wrap border-l-2 border-[#e8e8e8] pl-3">

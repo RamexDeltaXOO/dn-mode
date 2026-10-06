@@ -222,7 +222,7 @@ Suivre ma commande : {{orderUrl}}
 
 Livraison offerte des {{freeShippingThreshold}} EUR en ${Shipping.zone}.
 
-{{shopName}} — {{supportEmail}}`,
+{{shopName}} · {{supportEmail}}`,
   },
 
   {
@@ -267,7 +267,7 @@ Suivi : {{trackingUrl}}
 
 Delai estime : {{estimatedDays}}
 
-{{shopName}} — {{supportEmail}}`,
+{{shopName}} · {{supportEmail}}`,
   },
 
   {
@@ -323,7 +323,7 @@ Un souci ? Vous avez 14 jours pour contacter notre service client : {{supportUrl
 
 Remboursement sous 5 a 10 jours ouvres le cas echeant.
 
-{{shopName}} — {{supportEmail}}`,
+{{shopName}} · {{supportEmail}}`,
   },
 
   {
@@ -357,12 +357,12 @@ Votre message :
 
 Notre equipe vous repond sous 24 a 48h ouvrees.
 
-{{shopName}} — Service client — {{supportEmail}}`,
+{{shopName}}, Service client : {{supportEmail}}`,
   },
 
   {
     key: EmailTemplateKeys.savReply,
-    subject: "Re: {{subject}} — votre demande {{ticketRef}}",
+    subject: "Re: {{subject}} (votre demande {{ticketRef}})",
     description: "Reponse du service client, envoyee depuis le CRM (Admin > Messages).",
     variables: [
       ...BASE_VARIABLES,
@@ -375,11 +375,11 @@ Notre equipe vous repond sous 24 a 48h ouvrees.
     ],
     htmlBody: shell(
       [
-        label("Service client — {{ticketRef}}"),
+        label("Service client · {{ticketRef}}"),
         heading("Notre reponse"),
         paragraph("Bonjour {{name}},"),
         `            <div style="margin:0 0 24px 0;font-size:14px;line-height:1.7;color:${INK};">{{replyMessage}}</div>`,
-        paragraph("Bien a vous,<br /><strong style=\"color:" + INK + ";\">{{agentName}}</strong> — Service client {{shopName}}"),
+        paragraph("Bien a vous,<br /><strong style=\"color:" + INK + ";\">{{agentName}}</strong>, Service client {{shopName}}"),
         label("Votre message initial"),
         quote("{{customerMessage}}"),
       ].join("\n"),
@@ -390,7 +390,7 @@ Notre equipe vous repond sous 24 a 48h ouvrees.
 {{replyMessage}}
 
 Bien a vous,
-{{agentName}} — Service client {{shopName}}
+{{agentName}}, Service client {{shopName}}
 
 --- Votre message initial ---
 {{customerMessage}}

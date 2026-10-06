@@ -61,7 +61,7 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
 
   return (
     <>
-      {/* Top bar — statique sur desktop, defilante sur mobile */}
+      {/* Top bar : statique sur desktop, defilante sur mobile */}
       <div className="bg-[#121212] text-white text-[0.625rem] tracking-[1.5px] uppercase py-2 z-[110] relative overflow-hidden">
         <span className="hidden sm:block px-4 text-center">{banner}</span>
         <div className="sm:hidden overflow-hidden">
