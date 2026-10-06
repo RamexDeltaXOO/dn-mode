@@ -86,12 +86,12 @@ export default function Home() {
           >
             Profite de -10% sur ta premiere commande !
           </h1>
-          <p
+          {/* <p
             className="hero-subline opacity-0 translate-y-4 text-white/60 text-base sm:text-lg mt-3 tracking-[0.5px]"
             style={{ textShadow: "0 2px 20px rgba(0,0,0,0.6)" }}
           >
             Remise automatique au panier**
-          </p>
+          </p> */}
         </div>
         {/* Scroll indicator */}
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2">
@@ -119,9 +119,9 @@ export default function Home() {
       {/* Featured Products */}
       <section ref={productsRef} className="bg-[#f4f4f4] pb-16 sm:pb-24">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="animate-in opacity-0 translate-y-5 section-label text-center mb-10">
+          {/* <p className="animate-in opacity-0 translate-y-5 section-label text-center mb-10">
             Les premiers essentiels du printemps
-          </p>
+          </p> */}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {displayProducts.map((product) => (
