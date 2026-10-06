@@ -110,9 +110,9 @@ export default function Home() {
             <em className="font-['Playfair_Display'] italic">style</em> notre{" "}
             <em className="font-['Playfair_Display'] italic">identité</em>.
           </p>
-          <p className="animate-in opacity-0 translate-y-5 text-[0.8125rem] text-[#999999] tracking-[3px] uppercase mt-8">
+          {/* <p className="animate-in opacity-0 translate-y-5 text-[0.8125rem] text-[#999999] tracking-[3px] uppercase mt-8">
             Production <strong className="text-[#222222] font-medium">Ethique</strong>
-          </p>
+          </p> */}
         </div>
       </section>
 
