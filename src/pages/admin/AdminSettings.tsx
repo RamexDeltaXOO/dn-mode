@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { trpc } from "@/providers/trpc";
-import { Save, Check, CreditCard, Mail, Globe, Truck, Copy, Image } from "lucide-react";
-import { Paths, Shipping } from "@contracts/constants";
+import { Save, Check, CreditCard, Mail, Globe, Truck, Copy, Image, LayoutTemplate } from "lucide-react";
+import { HomeImageDefaults, Paths, Shipping } from "@contracts/constants";
+import SingleImageUploader from "@/components/admin/SingleImageUploader";
 
 type FieldProps = {
   label: string;
@@ -66,6 +67,9 @@ const EMPTY_FORM = {
   shipping_cost: "5.90",
   currency: "EUR",
   instagram_url: "",
+  // Page d'accueil (vide = image par defaut)
+  home_hero_image: "",
+  home_look_image: "",
   // Stripe
   stripe_publishable_key: "",
   stripe_secret_key: "",
@@ -125,7 +129,12 @@ export default function AdminSettings() {
 
 function SettingsForm({ configs }: { configs: ConfigRow[] }) {
   const utils = trpc.useUtils();
-  const setConfig = trpc.config.set.useMutation({ onSuccess: () => utils.config.list.invalidate() });
+  const setConfig = trpc.config.set.useMutation({
+    onSuccess: () => {
+      utils.config.list.invalidate();
+      utils.config.homeImages.invalidate();
+    },
+  });
   const [saved, setSaved] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -192,6 +201,53 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
               </div>
               <p className="text-[0.6875rem] text-[#999999]">
                 Livraison offerte a partir de {form.shipping_threshold || Shipping.freeThreshold}€ en {Shipping.zone}.
+              </p>
+            </div>
+          </div>
+
+          {/* Page d'accueil */}
+          <div className="bg-white shadow-sm border border-[#e8e8e8] p-6">
+            <SectionHeader icon={LayoutTemplate} title="Page d'accueil" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <SingleImageUploader
+                label="Image du bandeau principal"
+                hint="Affichee en fond, assombrie, derriere le message d'accueil. Format paysage conseille."
+                value={form.home_hero_image}
+                defaultUrl={HomeImageDefaults.hero}
+                storageReady={Boolean(storageStatus?.configured)}
+                aspect="aspect-[16/9]"
+                onChange={(v) => setForm({ ...form, home_hero_image: v })}
+                onCommit={(v) => {
+                  setForm((f) => ({ ...f, home_hero_image: v }));
+                  handleSave("home_hero_image", v);
+                }}
+              />
+              <SingleImageUploader
+                label="Image « Look du moment »"
+                hint="Affichee au format 16/9 sous les produits, avec le bouton vers la collection."
+                value={form.home_look_image}
+                defaultUrl={HomeImageDefaults.look}
+                storageReady={Boolean(storageStatus?.configured)}
+                aspect="aspect-[16/9]"
+                onChange={(v) => setForm({ ...form, home_look_image: v })}
+                onCommit={(v) => {
+                  setForm((f) => ({ ...f, home_look_image: v }));
+                  handleSave("home_look_image", v);
+                }}
+              />
+            </div>
+            <div className="flex gap-2 flex-wrap items-center mt-4">
+              <button
+                onClick={() => {
+                  handleSave("home_hero_image", form.home_hero_image);
+                  handleSave("home_look_image", form.home_look_image);
+                }}
+                className="text-[0.625rem] uppercase tracking-[1px] border border-[#e0e0e0] px-3 py-1.5 hover:border-[#222222]"
+              >
+                {saved === "home_hero_image" || saved === "home_look_image" ? "OK" : "Enregistrer les visuels"}
+              </button>
+              <p className="text-[0.6875rem] text-[#999999]">
+                Une image envoyee est enregistree aussitot. Une URL collee a la main s&apos;enregistre avec ce bouton.
               </p>
             </div>
           </div>

@@ -62,6 +62,17 @@ export const ConfigKeys = {
 
   resendApiKey: "resend_api_key",
   fromEmail: "from_email",
+
+  homeHeroImage: "home_hero_image",
+  homeLookImage: "home_look_image",
+} as const;
+
+// ── Visuels de la page d'accueil ────────────────────────────
+// Images livrees avec le site, affichees tant qu'aucune autre n'est
+// choisie dans le CRM (Admin > Parametres > Page d'accueil).
+export const HomeImageDefaults = {
+  hero: "/hero-bg.jpg",
+  look: "/look-moment.jpg",
 } as const;
 
 // ── Transporteurs supportes via Sendcloud ───────────────────

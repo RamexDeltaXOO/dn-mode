@@ -3,11 +3,25 @@ import { eq, sql } from "drizzle-orm";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { siteConfig } from "@db/schema";
+import { ConfigKeys, HomeImageDefaults } from "@contracts/constants";
+import { getConfigValues } from "./lib/site-config";
 
 export const configRouter = createRouter({
   list: publicQuery.query(async () => {
     const db = getDb();
     return db.select().from(siteConfig);
+  }),
+
+  /**
+   * Visuels de la page d'accueil. Expose uniquement ces deux cles, jamais
+   * le reste de la configuration, et retombe sur les images par defaut.
+   */
+  homeImages: publicQuery.query(async () => {
+    const values = await getConfigValues([ConfigKeys.homeHeroImage, ConfigKeys.homeLookImage]);
+    return {
+      hero: values[ConfigKeys.homeHeroImage]?.trim() || HomeImageDefaults.hero,
+      look: values[ConfigKeys.homeLookImage]?.trim() || HomeImageDefaults.look,
+    };
   }),
 
   getByKey: publicQuery

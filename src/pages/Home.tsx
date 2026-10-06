@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Link } from "react-router";
 import { trpc } from "@/providers/trpc";
+import { HomeImageDefaults } from "@contracts/constants";
 import gsap from "gsap";
 
 export default function Home() {
@@ -12,6 +13,14 @@ export default function Home() {
 
   const { data: featuredProducts } = trpc.product.list.useQuery({ featured: true, page: 1, limit: 8 });
   const { data: allProducts } = trpc.product.list.useQuery({ page: 1, limit: 6 });
+
+  // Visuels choisis dans le CRM. Rien n'est affiche pendant le chargement pour
+  // eviter de montrer l'ancienne image puis la nouvelle.
+  const { data: homeImages, isError: homeImagesError } = trpc.config.homeImages.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000,
+  });
+  const heroImage = homeImages?.hero ?? (homeImagesError ? HomeImageDefaults.hero : undefined);
+  const lookImage = homeImages?.look ?? (homeImagesError ? HomeImageDefaults.look : undefined);
 
   // Track page view
   const trackView = trpc.analytics.trackPageView.useMutation();
@@ -63,11 +72,13 @@ export default function Home() {
         ref={heroRef}
         className="relative w-full min-h-[500px] h-[60vh] sm:h-[70vh] bg-[#121212] overflow-hidden flex items-center justify-center"
       >
-        <img
-          src="/hero-bg.jpg"
-          alt="DN MODE"
-          className="absolute inset-0 w-full h-full object-cover opacity-40"
-        />
+        {heroImage && (
+          <img
+            src={heroImage}
+            alt="DN MODE"
+            className="absolute inset-0 w-full h-full object-cover opacity-40"
+          />
+        )}
         <div className="relative z-10 text-center px-6">
           <h1
             className="hero-headline opacity-0 translate-y-4 text-white text-3xl sm:text-4xl md:text-5xl font-light tracking-[-1.5px]"
@@ -159,12 +170,14 @@ export default function Home() {
       {/* Look du Moment */}
       <section ref={lookRef} className="bg-[#f4f4f4] pb-16 sm:pb-24">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="animate-in opacity-0 translate-y-5 relative aspect-[16/9] overflow-hidden">
-            <img
-              src="/look-moment.jpg"
-              alt="Look du Moment"
-              className="w-full h-full object-cover"
-            />
+          <div className="animate-in opacity-0 translate-y-5 relative aspect-[16/9] overflow-hidden bg-[#eaeaea]">
+            {lookImage && (
+              <img
+                src={lookImage}
+                alt="Look du Moment"
+                className="w-full h-full object-cover"
+              />
+            )}
             <div className="absolute inset-0 flex items-center justify-center">
               <Link
                 to="/collections/look-du-moment"

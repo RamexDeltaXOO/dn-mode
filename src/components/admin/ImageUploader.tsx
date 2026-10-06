@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 import { Upload, X, Link2, GripVertical, AlertCircle } from "lucide-react";
-import { Paths, UPLOAD_ALLOWED_TYPES, UPLOAD_MAX_BYTES } from "@contracts/constants";
+import { UPLOAD_ALLOWED_TYPES } from "@contracts/constants";
 import { trpc } from "@/providers/trpc";
+import { uploadImage, UPLOAD_MAX_MB } from "@/lib/upload";
 
 interface ImageUploaderProps {
   value: string[];
@@ -9,7 +10,6 @@ interface ImageUploaderProps {
 }
 
 const ACCEPT = UPLOAD_ALLOWED_TYPES.join(",");
-const MAX_MB = Math.round(UPLOAD_MAX_BYTES / (1024 * 1024));
 
 /**
  * Gestion des images d'un produit : envoi de fichiers vers le stockage,
@@ -35,28 +35,10 @@ export default function ImageUploader({ value, onChange }: ImageUploaderProps) {
     const uploaded: string[] = [];
 
     for (const file of list) {
-      if (file.size > UPLOAD_MAX_BYTES) {
-        setError(`${file.name} depasse ${MAX_MB} Mo.`);
-        continue;
-      }
       try {
-        const body = new FormData();
-        body.append("file", file);
-        const response = await fetch(Paths.upload, {
-          method: "POST",
-          body,
-          headers: {
-            "x-local-auth-token": localStorage.getItem("dnmode_local_token") || "",
-          },
-        });
-        const data = (await response.json()) as { url?: string; error?: string };
-        if (!response.ok || !data.url) {
-          setError(data.error || `Echec de l'envoi de ${file.name}.`);
-          continue;
-        }
-        uploaded.push(data.url);
-      } catch {
-        setError(`Echec de l'envoi de ${file.name}.`);
+        uploaded.push(await uploadImage(file));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : `Echec de l'envoi de ${file.name}.`);
       }
     }
 
@@ -174,7 +156,7 @@ export default function ImageUploader({ value, onChange }: ImageUploaderProps) {
               Choisir des images
             </button>
             <p className="text-[0.6875rem] text-[#999999] mt-2">
-              ou glissez-deposez — JPEG, PNG, WebP, AVIF — {MAX_MB} Mo max
+              ou glissez-deposez (JPEG, PNG, WebP, AVIF, {UPLOAD_MAX_MB} Mo max)
             </p>
           </>
         )}
