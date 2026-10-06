@@ -102,9 +102,9 @@ export default function Home() {
       {/* Brand Statement */}
       <section ref={brandRef} className="bg-[#f4f4f4] py-16 sm:py-24">
         <div className="max-w-[600px] mx-auto px-6 text-center">
-          <div className="animate-in opacity-0 translate-y-5 mb-6">
+          {/* <div className="animate-in opacity-0 translate-y-5 mb-6">
             <img src="/logo-dnmode.png" alt="DN MODE" className="h-24 sm:h-28 w-auto mx-auto" />
-          </div>
+          </div> */}
           <p className="animate-in opacity-0 translate-y-5 text-[0.9375rem] text-[#666666] leading-[1.6]">
             Fais de ton{" "}
             <em className="font-['Playfair_Display'] italic">style</em> ton{" "}
