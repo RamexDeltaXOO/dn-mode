@@ -99,7 +99,7 @@ export default function Login() {
     <div className="pt-[92px] min-h-[100dvh] flex items-center justify-center bg-[#f4f4f4]">
       <div className="w-full max-w-[400px] bg-white border border-[#e8e8e8] p-8">
         <div className="text-center mb-8">
-          <img src="/logo-dnmode.png" alt="DN MODE" className="h-8 w-auto mx-auto mb-4" />
+          <img src="/logo-dnmode.png" alt="DN MODE" className="h-20 w-auto mx-auto mb-4" />
           <p className="text-[0.8125rem] text-[#666666] mt-2">
             {mode === "login" ? "Connectez-vous a votre compte" : "Creez votre compte"}
           </p>

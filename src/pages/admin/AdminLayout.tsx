@@ -58,7 +58,7 @@ export default function AdminLayout() {
       {/* Sidebar */}
       <aside className="w-[250px] bg-[#1a1a1a] text-white flex flex-col flex-shrink-0 fixed h-full overflow-auto">
         <div className="p-6 flex items-center gap-3">
-          <img src="/logo-dnmode.png" alt="DN MODE" className="h-8 w-auto brightness-0 invert" />
+          <img src="/logo-dnmode.png" alt="DN MODE" className="h-14 w-auto brightness-0 invert" />
         </div>
 
         <nav className="flex-1 px-4">

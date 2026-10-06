@@ -47,7 +47,7 @@ function shell(content: string, opts: { preheader: string }): string {
         <tr>
           <td align="center" style="padding:32px 32px 24px 32px;border-bottom:1px solid ${HAIRLINE};">
             <a href="{{shopUrl}}" style="text-decoration:none;">
-              <img src="{{logoUrl}}" alt="DN MODE" height="34" style="height:34px;width:auto;border:0;display:block;" />
+              <img src="{{logoUrl}}" alt="DN MODE" height="72" style="height:72px;width:auto;border:0;display:block;" />
             </a>
           </td>
         </tr>

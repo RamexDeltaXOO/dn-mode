@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { Menu, Search, ShoppingBag, User } from "lucide-react";
 import { Shipping, freeShippingBanner } from "@contracts/constants";
 import { useAuth } from "@/hooks/useAuth";
@@ -34,6 +34,7 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
   const [hidden, setHidden] = useState(false);
   const [lastScroll, setLastScroll] = useState(0);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
 
   const { data: cartData } = trpc.cart.get.useQuery();
@@ -59,6 +60,10 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
     return () => window.removeEventListener("scroll", handleScroll);
   }, [lastScroll]);
 
+  // Header transparent au-dessus de la photo sombre de l'accueil : logo et
+  // icones passent en blanc pour rester lisibles.
+  const overHero = pathname === "/" && !scrolled;
+
   return (
     <>
       {/* Top bar : statique sur desktop, defilante sur mobile */}
@@ -78,7 +83,7 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
       <header
         className={`fixed left-0 right-0 z-[100] transition-all duration-300 ${
           scrolled ? "bg-white/95 backdrop-blur-sm shadow-[0_1px_0_rgba(0,0,0,0.05)] top-0" : "bg-transparent top-8"
-        } ${hidden ? "-translate-y-full" : "translate-y-0"}`}
+        } ${hidden ? "-translate-y-full" : "translate-y-0"} ${overHero ? "text-white" : ""}`}
       >
         <div className="flex items-center justify-between h-[60px] px-4 sm:px-6 lg:px-8 max-w-[1400px] mx-auto">
           {/* Left: Menu */}
@@ -87,12 +92,16 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
           </button>
 
           {/* Center: Logo */}
-          <Link to="/" className="absolute left-1/2 -translate-x-1/2" aria-label="DN MODE">
+          <Link to="/" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" aria-label="DN MODE">
             <img
               src="/logo-dnmode.png"
               alt="DN MODE"
-              className={`h-6 sm:h-7 w-auto transition-[filter] duration-300 ${
-                scrolled ? "" : "drop-shadow-[0_1px_8px_rgba(255,255,255,0.55)]"
+              className={`h-11 sm:h-[52px] w-auto transition-[filter] duration-300 ${
+                overHero
+                  ? "brightness-0 invert"
+                  : scrolled
+                    ? ""
+                    : "drop-shadow-[0_1px_8px_rgba(255,255,255,0.55)]"
               }`}
             />
           </Link>
@@ -109,7 +118,7 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
             )}
             {isAuthenticated ? (
               <div className="flex items-center gap-2">
-                <span className="text-[0.625rem] text-[#666666] hidden sm:inline">{user?.name}</span>
+                <span className={`text-[0.625rem] hidden sm:inline ${overHero ? "text-white/70" : "text-[#666666]"}`}>{user?.name}</span>
                 <button onClick={logout} className="p-1 hover:opacity-60 transition-opacity" title="Deconnexion">
                   <User size={20} strokeWidth={1.5} />
                 </button>
