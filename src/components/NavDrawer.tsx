@@ -12,7 +12,6 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
     { name: "Chemises / Hauts", slug: "chemises-hauts" },
     { name: "Sweats / Pulls", slug: "sweats-pulls" },
     { name: "Robes", slug: "robes" },
-    { name: "Pantalons", slug: "pantalons" },
     { name: "Jupes", slug: "jupes" },
     { name: "Ensembles", slug: "ensembles" },
     { name: "Gilets / Vestes", slug: "gilets-vestes" },
