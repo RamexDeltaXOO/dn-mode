@@ -72,7 +72,7 @@ module.exports = {
           "0%,70%,100%": { opacity: "1" },
           "20%,50%": { opacity: "0" },
         },
-        // Bandeau defilant (mobile) : la piste contient le message en double,
+        // Bandeau defilant (mobile et desktop) : la piste contient le message en double,
         // translater de -50% boucle donc sans saut visible.
         marquee: {
           from: { transform: "translateX(0)" },
@@ -83,7 +83,7 @@ module.exports = {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "caret-blink": "caret-blink 1.25s ease-out infinite",
-        marquee: "marquee 18s linear infinite",
+        marquee: "marquee 72s linear infinite",
       },
     },
   },

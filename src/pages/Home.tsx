@@ -80,12 +80,12 @@ export default function Home() {
           />
         )}
         <div className="relative z-10 text-center px-6">
-          <h1
-            className="hero-headline opacity-0 translate-y-4 text-white text-3xl sm:text-4xl md:text-5xl font-light tracking-[-1.5px]"
-            style={{ textShadow: "0 2px 30px rgba(0,0,0,0.6)" }}
+          <Link
+            to="/collections/all"
+            className="hero-headline opacity-0 translate-y-4 inline-block bg-white text-[#121212] text-[0.75rem] sm:text-[0.8125rem] uppercase tracking-[3px] font-medium px-8 py-4 hover:bg-[#121212] hover:text-white border border-white transition-colors duration-300"
           >
-            Profite de -10% sur ta premiere commande !
-          </h1>
+            Nouvelle collection
+          </Link>
           {/* <p
             className="hero-subline opacity-0 translate-y-4 text-white/60 text-base sm:text-lg mt-3 tracking-[0.5px]"
             style={{ textShadow: "0 2px 20px rgba(0,0,0,0.6)" }}
@@ -105,7 +105,7 @@ export default function Home() {
           {/* <div className="animate-in opacity-0 translate-y-5 mb-6">
             <img src="/logo-dnmode.png" alt="DN MODE" className="h-24 sm:h-28 w-auto mx-auto" />
           </div> */}
-          <p className="animate-in opacity-0 translate-y-5 text-[0.9375rem] text-[#666666] leading-[1.6]">
+          <p className="animate-in opacity-0 translate-y-5 text-[0.9375rem] text-black font-bold leading-[1.6]">
             DN MODE votre{" "}
             <em className="font-['Playfair_Display'] italic">style</em> notre{" "}
             <em className="font-['Playfair_Display'] italic">identité</em>.

@@ -11,7 +11,7 @@ interface HeaderProps {
   onNavOpen: () => void;
 }
 
-const SECONDARY_MESSAGES = ["Paiement securise", "Retours sous 14 jours"];
+const SECONDARY_MESSAGES = ["Paiement securise", "Ni echange ni remboursement"];
 
 /** Une sequence complete du bandeau, dupliquee pour une boucle sans couture. */
 function MarqueeSequence({ messages }: { messages: string[] }) {
@@ -47,7 +47,8 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
   });
   const banner = shippingSettings?.banner ?? freeShippingBanner();
   const threshold = shippingSettings?.threshold ?? Shipping.freeThreshold;
-  const marqueeMessages = [banner, ...SECONDARY_MESSAGES];
+  // Repete pour que la sequence couvre toute la largeur d'un ecran desktop.
+  const marqueeMessages = Array.from({ length: 4 }, () => [banner, ...SECONDARY_MESSAGES]).flat();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -66,10 +67,9 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
 
   return (
     <>
-      {/* Top bar : statique sur desktop, defilante sur mobile */}
+      {/* Top bar : bandeau defilant sur mobile comme sur desktop */}
       <div className="bg-[#121212] text-white text-[0.625rem] tracking-[1.5px] uppercase py-2 z-[110] relative overflow-hidden">
-        <span className="hidden sm:block px-4 text-center">{banner}</span>
-        <div className="sm:hidden overflow-hidden">
+        <div className="overflow-hidden">
           <div className="marquee-track flex w-max whitespace-nowrap animate-marquee">
             <MarqueeSequence messages={marqueeMessages} />
             <span aria-hidden="true" className="flex">
