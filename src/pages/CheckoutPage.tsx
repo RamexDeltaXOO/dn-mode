@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { Link } from "react-router";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { Link, useSearchParams } from "react-router";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { carrierLabel } from "@contracts/constants";
@@ -9,6 +9,110 @@ import ShippingMethodSelector from "@/components/ShippingMethodSelector";
 import type { ShippingMethodOption } from "@/components/ShippingMethodSelector";
 import ServicePointPicker from "@/components/ServicePointPicker";
 import type { SelectedServicePoint } from "@/components/ServicePointPicker";
+
+function PaymentSuccess({ orderNumber, carrierName, servicePoint }: {
+  orderNumber: string;
+  carrierName: string | null;
+  servicePoint: string | null;
+}) {
+  return (
+    <div className="text-center py-12">
+      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+        <Check size={32} className="text-green-600" />
+      </div>
+      <h2 className="text-2xl font-light text-[#222222] mb-2">Paiement reussi !</h2>
+      <p className="text-[0.9375rem] text-[#666666] mb-1">Commande {orderNumber}</p>
+      {carrierName && (
+        <p className="text-[0.8125rem] text-[#666666]">Livraison : {carrierName}</p>
+      )}
+      {servicePoint && (
+        <p className="text-[0.8125rem] text-[#666666]">Point relais : {servicePoint}</p>
+      )}
+      <p className="text-[0.8125rem] text-[#999999] mt-2 mb-6">Un email de confirmation a ete envoye.</p>
+      <Link
+        to="/"
+        className="inline-block bg-[#222222] text-white px-8 py-3 text-[0.75rem] uppercase tracking-[2px] hover:bg-[#333333]"
+      >
+        Retour a l&apos;accueil
+      </Link>
+    </div>
+  );
+}
+
+/**
+ * Retour sur /checkout apres un moyen de paiement qui redirige (PayPal,
+ * Klarna...). Stripe ajoute payment_intent et redirect_status a l'URL : on
+ * fait confirmer la commande par le serveur, qui verifie le paiement aupres
+ * de Stripe avant de la valider.
+ */
+function PaymentReturn({ paymentIntentId, redirectStatus }: { paymentIntentId: string; redirectStatus: string | null }) {
+  const utils = trpc.useUtils();
+  const clearCart = trpc.cart.clear.useMutation({ onSuccess: () => utils.cart.get.invalidate() });
+  const confirmPayment = trpc.stripe.confirmPayment.useMutation({ onSuccess: () => clearCart.mutate() });
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (started.current || redirectStatus !== "succeeded") return;
+    started.current = true;
+    confirmPayment.mutate({ paymentIntentId });
+  }, [paymentIntentId, redirectStatus, confirmPayment]);
+
+  const backToCheckout = (
+    <Link
+      to="/checkout"
+      className="inline-block bg-[#222222] text-white px-8 py-3 text-[0.75rem] uppercase tracking-[2px] hover:bg-[#333333] mt-6"
+    >
+      Revenir au paiement
+    </Link>
+  );
+
+  if (redirectStatus === "processing") {
+    return (
+      <div className="text-center py-12">
+        <h2 className="text-2xl font-light text-[#222222] mb-2">Paiement en cours de validation</h2>
+        <p className="text-[0.8125rem] text-[#666666]">
+          Ton moyen de paiement doit encore valider l&apos;operation. Tu recevras un email des qu&apos;elle sera confirmee.
+        </p>
+      </div>
+    );
+  }
+
+  if (redirectStatus !== "succeeded" || confirmPayment.isError) {
+    return (
+      <div className="text-center py-12">
+        <h2 className="text-2xl font-light text-[#222222] mb-2">Le paiement n&apos;a pas abouti</h2>
+        <p className="text-[0.8125rem] text-[#666666]">
+          {confirmPayment.error?.message ?? "Aucun montant n'a ete preleve. Tu peux reessayer avec un autre moyen de paiement."}
+        </p>
+        {backToCheckout}
+      </div>
+    );
+  }
+
+  const order = confirmPayment.data?.order;
+  if (!order) {
+    return (
+      <div className="py-12 flex flex-col items-center gap-4">
+        <div className="w-8 h-8 border-2 border-[#222222] border-t-transparent animate-spin" />
+        <p className="text-[0.8125rem] text-[#666666]">Confirmation du paiement...</p>
+      </div>
+    );
+  }
+
+  return (
+    <PaymentSuccess
+      orderNumber={order.orderNumber}
+      carrierName={
+        order.shippingCarrier
+          ? `${carrierLabel(order.shippingCarrier)}${order.shippingMethodName ? ` · ${order.shippingMethodName}` : ""}`
+          : null
+      }
+      servicePoint={
+        order.servicePointName ? [order.servicePointName, order.servicePointAddress].filter(Boolean).join(", ") : null
+      }
+    />
+  );
+}
 
 function CheckoutForm({ clientSecret, orderId, orderNumber, total, carrierName, servicePoint }: {
   clientSecret: string;
@@ -21,10 +125,9 @@ function CheckoutForm({ clientSecret, orderId, orderNumber, total, carrierName, 
   const stripe = useStripe();
   const elements = useElements();
   const utils = trpc.useUtils();
+  const clearCart = trpc.cart.clear.useMutation({ onSuccess: () => utils.cart.get.invalidate() });
   const confirmPayment = trpc.stripe.confirmPayment.useMutation({
-    onSuccess: () => {
-      utils.cart.get.invalidate();
-    },
+    onSuccess: () => clearCart.mutate(),
   });
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -65,28 +168,11 @@ function CheckoutForm({ clientSecret, orderId, orderNumber, total, carrierName, 
 
   if (message === "success") {
     return (
-      <div className="text-center py-12">
-        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <Check size={32} className="text-green-600" />
-        </div>
-        <h2 className="text-2xl font-light text-[#222222] mb-2">Paiement reussi !</h2>
-        <p className="text-[0.9375rem] text-[#666666] mb-1">Commande {orderNumber}</p>
-        {carrierName && (
-          <p className="text-[0.8125rem] text-[#666666]">Livraison : {carrierName}</p>
-        )}
-        {servicePoint && (
-          <p className="text-[0.8125rem] text-[#666666]">
-            Point relais : {servicePoint.name}, {servicePoint.address}
-          </p>
-        )}
-        <p className="text-[0.8125rem] text-[#999999] mt-2 mb-6">Un email de confirmation a ete envoye.</p>
-        <Link
-          to="/"
-          className="inline-block bg-[#222222] text-white px-8 py-3 text-[0.75rem] uppercase tracking-[2px] hover:bg-[#333333]"
-        >
-          Retour a l&apos;accueil
-        </Link>
-      </div>
+      <PaymentSuccess
+        orderNumber={orderNumber}
+        carrierName={carrierName}
+        servicePoint={servicePoint ? `${servicePoint.name}, ${servicePoint.address}` : null}
+      />
     );
   }
 
@@ -116,6 +202,23 @@ function CheckoutForm({ clientSecret, orderId, orderNumber, total, carrierName, 
 }
 
 export default function CheckoutPage() {
+  const [params] = useSearchParams();
+  const paymentIntentId = params.get("payment_intent");
+
+  if (paymentIntentId) {
+    return (
+      <div className="pt-[92px] min-h-[100dvh] bg-[#f4f4f4]">
+        <div className="max-w-[900px] mx-auto px-4 sm:px-6 py-8">
+          <PaymentReturn paymentIntentId={paymentIntentId} redirectStatus={params.get("redirect_status")} />
+        </div>
+      </div>
+    );
+  }
+
+  return <CheckoutFlow />;
+}
+
+function CheckoutFlow() {
   const { data: cart } = trpc.cart.get.useQuery();
   const { data: stripeConfig } = trpc.stripe.getConfig.useQuery();
 

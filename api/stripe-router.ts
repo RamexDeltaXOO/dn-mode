@@ -218,13 +218,27 @@ export const stripeRouter = createRouter({
 
   confirmPayment: publicQuery
     .input(z.object({
-      orderId: z.number(),
+      // Absent au retour d'un moyen de paiement qui redirige (PayPal,
+      // Klarna...) : la commande est alors retrouvee via le paiement.
+      orderId: z.number().optional(),
       paymentIntentId: z.string().optional(),
+    }).refine((v) => v.orderId !== undefined || !!v.paymentIntentId, {
+      message: "orderId ou paymentIntentId requis",
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
 
-      const [existing] = await db.select().from(orders).where(eq(orders.id, input.orderId));
+      let orderId = input.orderId;
+      if (orderId === undefined) {
+        const [byIntent] = await db
+          .select()
+          .from(payments)
+          .where(eq(payments.stripePaymentIntentId, input.paymentIntentId!));
+        orderId = byIntent?.orderId ?? undefined;
+      }
+      if (orderId === undefined) throw new TRPCError({ code: "NOT_FOUND", message: "Commande introuvable" });
+
+      const [existing] = await db.select().from(orders).where(eq(orders.id, orderId));
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Commande introuvable" });
 
       // Cette route est publique : quand Stripe est configure, on verifie
@@ -232,7 +246,7 @@ export const stripeRouter = createRouter({
       // de la valider et de retirer le stock.
       const stripe = await getStripe();
       if (stripe) {
-        const [payment] = await db.select().from(payments).where(eq(payments.orderId, input.orderId));
+        const [payment] = await db.select().from(payments).where(eq(payments.orderId, orderId));
         if (!payment?.stripePaymentIntentId || payment.stripePaymentIntentId !== input.paymentIntentId) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Paiement introuvable pour cette commande" });
         }
@@ -252,15 +266,15 @@ export const stripeRouter = createRouter({
       const updateResult = await db
         .update(orders)
         .set({ status: "processing" })
-        .where(and(eq(orders.id, input.orderId), eq(orders.status, "pending")));
+        .where(and(eq(orders.id, orderId), eq(orders.status, "pending")));
       const justConfirmed =
         Number((updateResult as unknown as Array<{ affectedRows?: number }>)[0]?.affectedRows ?? 0) > 0;
 
       if (justConfirmed) {
-        await decrementStockForOrder(input.orderId);
+        await decrementStockForOrder(orderId);
       }
 
-      const [order] = await db.select().from(orders).where(eq(orders.id, input.orderId));
+      const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
 
       if (order && justConfirmed) {
         try {
