@@ -15,6 +15,7 @@ import { campaignRouter } from "./campaign-router";
 import { shippingRouter } from "./shipping-router";
 import { sendcloudRouter } from "./sendcloud-router";
 import { uploadRouter } from "./upload-router";
+import { reviewRouter } from "./review-router";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -36,6 +37,7 @@ export const appRouter = createRouter({
   shipping: shippingRouter,
   sendcloud: sendcloudRouter,
   upload: uploadRouter,
+  review: reviewRouter,
 });
 
 export type AppRouter = typeof appRouter;

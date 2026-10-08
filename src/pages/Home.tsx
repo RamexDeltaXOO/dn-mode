@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { HomeImageDefaults } from "@contracts/constants";
 import gsap from "gsap";
+import ReviewsCarousel from "@/components/ReviewsCarousel";
 
 export default function Home() {
   const heroRef = useRef<HTMLDivElement>(null);
@@ -185,6 +186,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Avis clients */}
+      <ReviewsCarousel />
     </div>
   );
 }

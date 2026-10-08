@@ -18,6 +18,24 @@ const ADDITIVE_COLUMNS: Array<{ table: string; column: string; definition: strin
   { table: "products", column: "variant_stock", definition: "json NULL" },
 ];
 
+/** Tables ajoutees apres la creation de la base de production. */
+const ADDITIVE_TABLES: Array<{ table: string; ddl: string }> = [
+  {
+    table: "reviews",
+    ddl: `CREATE TABLE IF NOT EXISTS \`reviews\` (
+      \`id\` int AUTO_INCREMENT NOT NULL,
+      \`author_name\` varchar(255) NOT NULL,
+      \`subtitle\` varchar(255),
+      \`content\` text NOT NULL,
+      \`rating\` int NOT NULL DEFAULT 5,
+      \`is_active\` boolean DEFAULT true,
+      \`sort_order\` int DEFAULT 0,
+      \`created_at\` timestamp NOT NULL DEFAULT (now()),
+      PRIMARY KEY (\`id\`)
+    )`,
+  },
+];
+
 function firstRow(result: unknown): Record<string, unknown> | undefined {
   // mysql2 renvoie [lignes, champs].
   const rows = Array.isArray(result) ? result[0] : undefined;
@@ -26,6 +44,13 @@ function firstRow(result: unknown): Record<string, unknown> | undefined {
 
 export async function ensureSchema(): Promise<void> {
   const db = getDb();
+  for (const { table, ddl } of ADDITIVE_TABLES) {
+    try {
+      await db.execute(sql.raw(ddl));
+    } catch (err) {
+      console.error(`[schema] Impossible de creer la table ${table} :`, err);
+    }
+  }
   for (const { table, column, definition } of ADDITIVE_COLUMNS) {
     try {
       const result = await db.execute(sql`

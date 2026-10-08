@@ -291,3 +291,19 @@ export const shippingMethods = mysqlTable("shipping_methods", {
 });
 
 export type ShippingMethod = typeof shippingMethods.$inferSelect;
+
+// ── Avis clients ────────────────────────────────────────────
+// Saisis depuis le CRM et affiches en carrousel sur l'accueil.
+export const reviews = mysqlTable("reviews", {
+  id: int("id").autoincrement().primaryKey(),
+  authorName: varchar("author_name", { length: 255 }).notNull(),
+  // Ligne grise sous le nom (ville, produit achete...).
+  subtitle: varchar("subtitle", { length: 255 }),
+  content: text("content").notNull(),
+  rating: int("rating").notNull().default(5),
+  isActive: boolean("is_active").default(true),
+  sortOrder: int("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Review = typeof reviews.$inferSelect;

@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   Settings,
   BarChart3,
+  Star,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -24,6 +25,7 @@ const navItems = [
   { icon: Layers, label: "Collections", path: "/admin/collections" },
   { icon: ShoppingCart, label: "Commandes", path: "/admin/orders" },
   { icon: Truck, label: "Livraison", path: "/admin/shipping" },
+  { icon: Star, label: "Avis", path: "/admin/reviews" },
   { icon: Mail, label: "Messages", path: "/admin/messages" },
   { icon: MailOpen, label: "Emails", path: "/admin/emails" },
   { icon: Megaphone, label: "Campagnes", path: "/admin/campaigns" },
