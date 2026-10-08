@@ -12,6 +12,7 @@ export const Paths = {
   googleAuthCallback: "/api/auth/google/callback",
   authCallback: "/auth/callback",
   upload: "/api/upload",
+  stripeWebhook: "/api/stripe/webhook",
 } as const;
 
 // ── Livraison ───────────────────────────────────────────────
@@ -43,6 +44,7 @@ export const ConfigKeys = {
 
   stripePublishableKey: "stripe_publishable_key",
   stripeSecretKey: "stripe_secret_key",
+  stripeWebhookSecret: "stripe_webhook_secret",
 
   sendcloudPublicKey: "sendcloud_public_key",
   sendcloudSecretKey: "sendcloud_secret_key",

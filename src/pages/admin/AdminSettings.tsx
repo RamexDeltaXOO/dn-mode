@@ -73,6 +73,7 @@ const EMPTY_FORM = {
   // Stripe
   stripe_publishable_key: "",
   stripe_secret_key: "",
+  stripe_webhook_secret: "",
   // Gmail OAuth
   gmail_client_id: "",
   gmail_client_secret: "",
@@ -137,6 +138,8 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
   });
   const [saved, setSaved] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [webhookCopied, setWebhookCopied] = useState(false);
+  const webhookUrl = typeof window !== "undefined" ? `${window.location.origin}${Paths.stripeWebhook}` : "";
 
   const { data: sendcloudStatus } = trpc.sendcloud.status.useQuery(undefined, { retry: false });
   const testSendcloud = trpc.sendcloud.testConnection.useMutation({
@@ -269,6 +272,33 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
               <p className="text-[0.6875rem] text-[#999999]">
                 Laissez vide pour utiliser le mode demo (paiement simule).
               </p>
+              <Field label="Webhook Signing Secret (whsec_...)" value={form.stripe_webhook_secret} onChange={(v) => setForm({ ...form, stripe_webhook_secret: v })} type="password" placeholder="whsec_..." />
+              <button onClick={() => handleSave("stripe_webhook_secret", form.stripe_webhook_secret)} className="text-[0.625rem] uppercase tracking-[1px] border border-[#e0e0e0] px-3 py-1.5 hover:border-[#222222]">
+                {saved === "stripe_webhook_secret" ? "OK" : "Enregistrer Webhook"}
+              </button>
+              <div className="bg-[#f4f4f4] p-3 text-[0.6875rem] text-[#666666]">
+                <p className="font-medium mb-1">URL du webhook :</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <code className="text-[0.625rem] bg-white px-2 py-1 border border-[#e0e0e0] break-all">{webhookUrl}</code>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard?.writeText(webhookUrl);
+                      setWebhookCopied(true);
+                      setTimeout(() => setWebhookCopied(false), 1500);
+                    }}
+                    className="flex items-center gap-1 text-[0.625rem] uppercase tracking-[1px] border border-[#e0e0e0] px-2 py-1 hover:border-[#222222] bg-white"
+                  >
+                    {webhookCopied ? <Check size={11} /> : <Copy size={11} />}
+                    {webhookCopied ? "Copie" : "Copier"}
+                  </button>
+                </div>
+                <p className="mt-2 text-[#999999]">
+                  Dans Stripe : Developpeurs &gt; Webhooks &gt; Ajouter une destination. Collez cette URL,
+                  choisissez les evenements payment_intent.succeeded et payment_intent.payment_failed,
+                  puis copiez ici le secret de signature (whsec_...). Il confirme les commandes meme si
+                  le client ferme son navigateur apres avoir paye.
+                </p>
+              </div>
             </div>
           </div>
 

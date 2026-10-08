@@ -7,7 +7,9 @@ import { ConfigKeys, HomeImageDefaults } from "@contracts/constants";
 import { getConfigValues } from "./lib/site-config";
 
 export const configRouter = createRouter({
-  list: publicQuery.query(async () => {
+  // Reserve a l'admin : la configuration contient les cles secretes
+  // (Stripe, Sendcloud, stockage...).
+  list: adminQuery.query(async () => {
     const db = getDb();
     return db.select().from(siteConfig);
   }),
@@ -24,7 +26,7 @@ export const configRouter = createRouter({
     };
   }),
 
-  getByKey: publicQuery
+  getByKey: adminQuery
     .input(z.object({ key: z.string() }))
     .query(async ({ input }) => {
       const db = getDb();

@@ -22,15 +22,56 @@ async function getStripeKey(): Promise<string> {
 }
 
 // Lazy load stripe
-let stripeInstance: any = null;
-async function getStripe() {
+let stripeInstance: import("stripe").Stripe | null = null;
+export async function getStripe() {
   if (!stripeInstance) {
     const key = await getStripeKey();
     if (key === "sk_test_dummy") return null;
-    const Stripe = require("stripe");
-    stripeInstance = Stripe(key);
+    const { default: Stripe } = await import("stripe");
+    stripeInstance = new Stripe(key);
   }
   return stripeInstance;
+}
+
+/**
+ * Passe une commande payee de pending a processing, en une seule requete
+ * conditionnelle : si la page de paiement et le webhook Stripe arrivent en
+ * meme temps, un seul gagne. Lui seul retire le stock et envoie l'email de
+ * confirmation. Renvoie la commande a jour.
+ */
+export async function markOrderPaid(orderId: number, req?: Request) {
+  const db = getDb();
+  const updateResult = await db
+    .update(orders)
+    .set({ status: "processing" })
+    .where(and(eq(orders.id, orderId), eq(orders.status, "pending")));
+  const justConfirmed =
+    Number((updateResult as unknown as Array<{ affectedRows?: number }>)[0]?.affectedRows ?? 0) > 0;
+
+  if (justConfirmed) {
+    await decrementStockForOrder(orderId);
+  }
+
+  const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
+
+  if (order && justConfirmed) {
+    try {
+      const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+      const variables = await buildOrderEmailVariables({ order, items, req });
+      const result = await sendTemplateEmail({
+        to: order.email,
+        templateKey: EmailTemplateKeys.orderConfirmation,
+        variables,
+      });
+      if (!result.success) {
+        console.error("[email] confirmation non envoyee:", result.error);
+      }
+    } catch (error) {
+      console.error("[email] confirmation a echoue:", error);
+    }
+  }
+
+  return order;
 }
 
 /** Numero de commande unique (meme schema que order-router). */
@@ -197,7 +238,8 @@ export const stripeRouter = createRouter({
           });
 
           return {
-            clientSecret: paymentIntent.client_secret,
+            // Toujours renseigne sur un PaymentIntent tout juste cree.
+            clientSecret: paymentIntent.client_secret as string,
             orderId,
             orderNumber,
             total,
@@ -260,43 +302,7 @@ export const stripeRouter = createRouter({
           .where(eq(payments.stripePaymentIntentId, payment.stripePaymentIntentId));
       }
 
-      // Passage pending -> processing en une seule requete : si deux appels
-      // arrivent en meme temps, un seul gagne. Lui seul retire le stock et
-      // envoie l'email de confirmation.
-      const updateResult = await db
-        .update(orders)
-        .set({ status: "processing" })
-        .where(and(eq(orders.id, orderId), eq(orders.status, "pending")));
-      const justConfirmed =
-        Number((updateResult as unknown as Array<{ affectedRows?: number }>)[0]?.affectedRows ?? 0) > 0;
-
-      if (justConfirmed) {
-        await decrementStockForOrder(orderId);
-      }
-
-      const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
-
-      if (order && justConfirmed) {
-        try {
-          const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
-          const variables = await buildOrderEmailVariables({
-            order,
-            items,
-            req: ctx.req,
-          });
-          const result = await sendTemplateEmail({
-            to: order.email,
-            templateKey: EmailTemplateKeys.orderConfirmation,
-            variables,
-          });
-          if (!result.success) {
-            console.error("[email] confirmation non envoyee:", result.error);
-          }
-        } catch (error) {
-          console.error("[email] confirmation a echoue:", error);
-        }
-      }
-
+      const order = await markOrderPaid(orderId, ctx.req);
       return { order };
     }),
 });

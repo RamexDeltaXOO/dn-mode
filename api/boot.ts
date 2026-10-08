@@ -8,6 +8,7 @@ import { env } from "./lib/env";
 import { createGoogleCallbackHandler } from "./lib/google-oauth";
 import { createUploadHandler } from "./lib/storage";
 import { ensureSchema } from "./lib/ensure-schema";
+import { createStripeWebhookHandler } from "./lib/stripe-webhook";
 import { Paths } from "@contracts/constants";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
@@ -17,6 +18,8 @@ app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
 app.get(Paths.googleAuthCallback, createGoogleCallbackHandler());
 // Upload des images produits (multipart, hors tRPC)
 app.post(Paths.upload, createUploadHandler());
+// Notifications de paiement envoyees par Stripe (signature verifiee)
+app.post(Paths.stripeWebhook, createStripeWebhookHandler());
 app.use("/api/trpc/*", async (c) => {
   return fetchRequestHandler({
     endpoint: "/api/trpc",
