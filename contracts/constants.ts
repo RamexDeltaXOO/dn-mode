@@ -140,6 +140,11 @@ export function variantKey(color?: string | null, size?: string | null): string 
   return `${color ?? ""}|${size ?? ""}`;
 }
 
+/** Chemin JSON MySQL vers une cle de variant_stock ("Noir|M" -> $."Noir|M"). */
+export function variantJsonPath(key: string): string {
+  return `$."${key.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
 /** Toutes les combinaisons attendues pour ces couleurs et tailles. */
 export function variantKeys(colors: string[], sizes: string[]): string[] {
   const cs = colors.length > 0 ? colors : [""];

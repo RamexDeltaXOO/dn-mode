@@ -2,12 +2,14 @@ import { z } from "zod";
 import { createRouter, publicQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { payments, orders, orderItems, products, siteConfig } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import { ConfigKeys, EmailTemplateKeys } from "@contracts/constants";
 import { quoteShipping } from "./lib/shipping";
 import { contentWeightGrams, getWeightSettings } from "./lib/weight";
 import { buildOrderEmailVariables } from "./order-router";
 import { sendTemplateEmail } from "./lib/mailer";
+import { decrementStockForOrder } from "./lib/stock";
 
 // Get Stripe key from DB config or env
 async function getStripeKey(): Promise<string> {
@@ -222,25 +224,45 @@ export const stripeRouter = createRouter({
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
 
-      const [before] = await db.select().from(orders).where(eq(orders.id, input.orderId));
-      // Un double appel ne doit pas renvoyer deux fois l'email de confirmation.
-      const alreadyConfirmed = before ? before.status !== "pending" : false;
+      const [existing] = await db.select().from(orders).where(eq(orders.id, input.orderId));
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Commande introuvable" });
 
-      await db
-        .update(orders)
-        .set({ status: "processing" })
-        .where(eq(orders.id, input.orderId));
-
-      if (input.paymentIntentId) {
+      // Cette route est publique : quand Stripe est configure, on verifie
+      // aupres de Stripe que le paiement de CETTE commande a bien abouti avant
+      // de la valider et de retirer le stock.
+      const stripe = await getStripe();
+      if (stripe) {
+        const [payment] = await db.select().from(payments).where(eq(payments.orderId, input.orderId));
+        if (!payment?.stripePaymentIntentId || payment.stripePaymentIntentId !== input.paymentIntentId) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Paiement introuvable pour cette commande" });
+        }
+        const intent = await stripe.paymentIntents.retrieve(payment.stripePaymentIntentId);
+        if (intent?.status !== "succeeded") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Le paiement n'a pas abouti" });
+        }
         await db
           .update(payments)
           .set({ status: "succeeded" })
-          .where(eq(payments.stripePaymentIntentId, input.paymentIntentId));
+          .where(eq(payments.stripePaymentIntentId, payment.stripePaymentIntentId));
+      }
+
+      // Passage pending -> processing en une seule requete : si deux appels
+      // arrivent en meme temps, un seul gagne. Lui seul retire le stock et
+      // envoie l'email de confirmation.
+      const updateResult = await db
+        .update(orders)
+        .set({ status: "processing" })
+        .where(and(eq(orders.id, input.orderId), eq(orders.status, "pending")));
+      const justConfirmed =
+        Number((updateResult as unknown as Array<{ affectedRows?: number }>)[0]?.affectedRows ?? 0) > 0;
+
+      if (justConfirmed) {
+        await decrementStockForOrder(input.orderId);
       }
 
       const [order] = await db.select().from(orders).where(eq(orders.id, input.orderId));
 
-      if (order && !alreadyConfirmed) {
+      if (order && justConfirmed) {
         try {
           const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
           const variables = await buildOrderEmailVariables({

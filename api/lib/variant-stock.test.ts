@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stockFor, variantKey, variantKeys } from "@contracts/constants";
+import { stockFor, variantJsonPath, variantKey, variantKeys } from "@contracts/constants";
 
 describe("stock par variante", () => {
   it("genere toutes les combinaisons couleur x taille", () => {
@@ -18,5 +18,13 @@ describe("stock par variante", () => {
   it("se rabat sur le stock global sans stock par variante", () => {
     expect(stockFor({ inventoryQuantity: 4, variantStock: null }, "Noir", "S")).toBe(4);
     expect(stockFor({ inventoryQuantity: 4, variantStock: {} }, null, null)).toBe(4);
+  });
+});
+
+describe("chemin JSON des variantes", () => {
+  it("entoure la cle de guillemets", () => {
+    expect(variantJsonPath("Noir|M")).toBe('$."Noir|M"');
+    expect(variantJsonPath('Blanc "casse"|S')).toBe('$."Blanc \\"casse\\"|S"');
+    expect(variantJsonPath("a\\b|")).toBe('$."a\\\\b|"');
   });
 });
