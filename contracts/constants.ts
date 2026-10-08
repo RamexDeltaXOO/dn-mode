@@ -130,3 +130,33 @@ export const EmailTemplateKeys = {
   savReply: "sav_reply",
   welcome: "welcome",
 } as const;
+
+// ── Stock par variante ──────────────────────────────────────
+// Stock saisi par combinaison couleur x taille, indexe par "couleur|taille".
+// Un produit sans couleur (ou sans taille) utilise une chaine vide de ce cote.
+export type VariantStock = Record<string, number>;
+
+export function variantKey(color?: string | null, size?: string | null): string {
+  return `${color ?? ""}|${size ?? ""}`;
+}
+
+/** Toutes les combinaisons attendues pour ces couleurs et tailles. */
+export function variantKeys(colors: string[], sizes: string[]): string[] {
+  const cs = colors.length > 0 ? colors : [""];
+  const ss = sizes.length > 0 ? sizes : [""];
+  return cs.flatMap((c) => ss.map((s) => variantKey(c, s)));
+}
+
+/**
+ * Stock disponible pour une variante. Sans stock par variante saisi, on se
+ * rabat sur le stock global du produit.
+ */
+export function stockFor(
+  product: { inventoryQuantity?: number | null; variantStock?: VariantStock | null },
+  color?: string | null,
+  size?: string | null,
+): number {
+  const vs = product.variantStock;
+  if (vs && Object.keys(vs).length > 0) return vs[variantKey(color, size)] ?? 0;
+  return product.inventoryQuantity ?? 0;
+}

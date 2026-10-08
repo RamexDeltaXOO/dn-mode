@@ -2,6 +2,7 @@ import { useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { Pencil, Trash2, Plus, Search, X } from "lucide-react";
 import ImageUploader from "@/components/admin/ImageUploader";
+import { variantKey, variantKeys } from "@contracts/constants";
 
 interface ProductForm {
   name: string;
@@ -14,6 +15,8 @@ interface ProductForm {
   sizes: string;
   weightGrams: string;
   inventoryQuantity: string;
+  /** Stock saisi par combinaison, indexe par variantKey(couleur, taille). */
+  variantStock: Record<string, string>;
   collectionId: string;
   isActive: boolean;
   isFeatured: boolean;
@@ -30,10 +33,15 @@ const emptyForm: ProductForm = {
   sizes: "",
   weightGrams: "",
   inventoryQuantity: "0",
+  variantStock: {},
   collectionId: "",
   isActive: true,
   isFeatured: false,
 };
+
+function parseList(value: string): string[] {
+  return value.split(",").map((s) => s.trim()).filter(Boolean);
+}
 
 export default function AdminProducts() {
   const utils = trpc.useUtils();
@@ -94,6 +102,9 @@ export default function AdminProducts() {
       sizes: (product.sizes || []).join(","),
       weightGrams: product.weightGrams ? String(product.weightGrams) : "",
       inventoryQuantity: String(product.inventoryQuantity || 0),
+      variantStock: Object.fromEntries(
+        Object.entries(product.variantStock || {}).map(([k, v]) => [k, String(v)]),
+      ),
       collectionId: product.collectionId ? String(product.collectionId) : "",
       isActive: product.isActive || false,
       isFeatured: product.isFeatured || false,
@@ -101,8 +112,22 @@ export default function AdminProducts() {
     setShowForm(true);
   };
 
+  // Des qu'il y a des couleurs ou des tailles, le stock se saisit par
+  // combinaison et le stock total en devient la somme.
+  const formColors = parseList(form.colors);
+  const formSizes = parseList(form.sizes);
+  const hasVariants = formColors.length > 0 || formSizes.length > 0;
+  const keys = variantKeys(formColors, formSizes);
+  const variantTotal = keys.reduce((sum, k) => sum + (parseInt(form.variantStock[k] ?? "", 10) || 0), 0);
+
+  const setVariantQty = (key: string, value: string) =>
+    setForm({ ...form, variantStock: { ...form.variantStock, [key]: value } });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const variantStock = hasVariants
+      ? Object.fromEntries(keys.map((k) => [k, Math.max(0, parseInt(form.variantStock[k] ?? "", 10) || 0)]))
+      : null;
     const data = {
       name: form.name,
       slug: form.slug || form.name.toLowerCase().replace(/\s+/g, "-"),
@@ -110,10 +135,11 @@ export default function AdminProducts() {
       description: form.description || undefined,
       shortDescription: form.shortDescription || undefined,
       images: form.images.filter((url) => url.trim() !== ""),
-      colors: form.colors ? form.colors.split(",").map((s) => s.trim()) : [],
-      sizes: form.sizes ? form.sizes.split(",").map((s) => s.trim()) : [],
+      colors: formColors,
+      sizes: formSizes,
       weightGrams: form.weightGrams.trim() === "" ? null : parseInt(form.weightGrams, 10) || 0,
-      inventoryQuantity: parseInt(form.inventoryQuantity) || 0,
+      inventoryQuantity: hasVariants ? variantTotal : parseInt(form.inventoryQuantity) || 0,
+      variantStock,
       collectionId: form.collectionId ? parseInt(form.collectionId) : undefined,
       isActive: form.isActive,
       isFeatured: form.isFeatured,
@@ -204,9 +230,12 @@ export default function AdminProducts() {
                   <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Stock</label>
                   <input
                     type="number"
-                    value={form.inventoryQuantity}
+                    min="0"
+                    value={hasVariants ? String(variantTotal) : form.inventoryQuantity}
                     onChange={(e) => setForm({ ...form, inventoryQuantity: e.target.value })}
-                    className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222]"
+                    disabled={hasVariants}
+                    title={hasVariants ? "Somme du stock par couleur et taille" : undefined}
+                    className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222] disabled:bg-[#f8f8f8] disabled:text-[#666666]"
                   />
                 </div>
               </div>
@@ -262,6 +291,55 @@ export default function AdminProducts() {
                   />
                 </div>
               </div>
+              {hasVariants && (
+                <div>
+                  <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">
+                    Stock par {formColors.length > 0 && formSizes.length > 0 ? "couleur et taille" : formColors.length > 0 ? "couleur" : "taille"}
+                  </label>
+                  <div className="overflow-x-auto border border-[#e0e0e0]">
+                    <table className="w-full text-[0.75rem]">
+                      {formSizes.length > 0 && (
+                        <thead>
+                          <tr className="bg-[#fafafa]">
+                            {formColors.length > 0 && <th className="px-2 py-1.5 text-left font-normal text-[#999999]" />}
+                            {formSizes.map((size) => (
+                              <th key={size} className="px-2 py-1.5 text-center font-normal text-[#666666]">{size}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                      )}
+                      <tbody>
+                        {(formColors.length > 0 ? formColors : [""]).map((color) => (
+                          <tr key={color} className="border-t border-[#f0f0f0]">
+                            {formColors.length > 0 && (
+                              <td className="px-2 py-1.5 text-[#666666] whitespace-nowrap">{color}</td>
+                            )}
+                            {(formSizes.length > 0 ? formSizes : [""]).map((size) => {
+                              const key = variantKey(color, size);
+                              return (
+                                <td key={key} className="px-1 py-1">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={form.variantStock[key] ?? ""}
+                                    onChange={(e) => setVariantQty(key, e.target.value)}
+                                    placeholder="0"
+                                    aria-label={`Stock ${[color, size].filter(Boolean).join(" ")}`}
+                                    className="w-full min-w-[3.5rem] border border-[#e0e0e0] px-2 py-1 text-center outline-none focus:border-[#222222]"
+                                  />
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-[0.625rem] text-[#999999] mt-1">
+                    Le stock total ({variantTotal}) est calcule automatiquement.
+                  </p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Collection</label>

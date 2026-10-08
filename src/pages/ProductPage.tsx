@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router";
-import { Shipping } from "@contracts/constants";
+import { Shipping, stockFor } from "@contracts/constants";
 import { trpc } from "@/providers/trpc";
 import { ChevronLeft, ShoppingBag, Check } from "lucide-react";
 
@@ -9,6 +9,7 @@ export default function ProductPage() {
   const [selectedColor, setSelectedColor] = useState<string>("");
   const [selectedSize, setSelectedSize] = useState<string>("");
   const [added, setAdded] = useState(false);
+  const [needChoice, setNeedChoice] = useState(false);
   const [mainImage, setMainImage] = useState<string>("");
 
   const { data: product, isLoading } = trpc.product.getBySlug.useQuery(
@@ -67,11 +68,31 @@ export default function ProductPage() {
 
   const colors = product.colors || [];
   const sizes = product.sizes || [];
-  const isOutOfStock = !product.inventoryQuantity || product.inventoryQuantity <= 0;
+  const productOutOfStock = !product.inventoryQuantity || product.inventoryQuantity <= 0;
+  // Stock par variante : une couleur (ou une taille) est disponible s'il reste
+  // au moins une piece avec l'autre choix courant, ou avec n'importe lequel.
+  const hasVariantStock = !!product.variantStock && Object.keys(product.variantStock).length > 0;
+  const sizeChoices = sizes.length > 0 ? sizes : [""];
+  const colorChoices = colors.length > 0 ? colors : [""];
+  const colorAvailable = (color: string) =>
+    !hasVariantStock ||
+    (selectedSize ? [selectedSize] : sizeChoices).some((s) => stockFor(product, color, s) > 0);
+  const sizeAvailable = (size: string) =>
+    !hasVariantStock ||
+    (selectedColor ? [selectedColor] : colorChoices).some((c) => stockFor(product, c, size) > 0);
+  const variantChosen =
+    (colors.length === 0 || !!selectedColor) && (sizes.length === 0 || !!selectedSize);
+  const variantStock = variantChosen ? stockFor(product, selectedColor || null, selectedSize || null) : null;
+  const isOutOfStock = productOutOfStock || (variantStock !== null && variantStock <= 0);
   const images = product.images || [];
 
   const handleAddToCart = () => {
     if (isOutOfStock) return;
+    if (!variantChosen) {
+      setNeedChoice(true);
+      return;
+    }
+    setNeedChoice(false);
     addToCart.mutate({
       productId: product.id,
       quantity: 1,
@@ -134,7 +155,7 @@ export default function ProductPage() {
                         selectedColor === color
                           ? "border-[#222222] bg-[#222222] text-white"
                           : "border-[#e0e0e0] text-[#666666] hover:border-[#222222]"
-                      }`}
+                      } ${colorAvailable(color) ? "" : "line-through opacity-50"}`}
                     >
                       {color}
                     </button>
@@ -155,7 +176,7 @@ export default function ProductPage() {
                         selectedSize === size
                           ? "border-[#222222] bg-[#222222] text-white"
                           : "border-[#e0e0e0] text-[#666666] hover:border-[#222222]"
-                      }`}
+                      } ${sizeAvailable(size) ? "" : "line-through opacity-50"}`}
                     >
                       {size}
                     </button>
@@ -189,6 +210,22 @@ export default function ProductPage() {
                 </>
               )}
             </button>
+
+            {variantStock !== null && variantStock > 0 && variantStock <= 3 && (
+              <p className="text-[0.75rem] text-[#b45309] mt-3">
+                Plus que {variantStock} piece{variantStock > 1 ? "s" : ""} dans cette variante
+              </p>
+            )}
+            {needChoice && !variantChosen && (
+              <p className="text-[0.75rem] text-red-600 mt-3">
+                Choisis {colors.length > 0 && !selectedColor ? "une couleur" : ""}
+                {colors.length > 0 && !selectedColor && sizes.length > 0 && !selectedSize ? " et " : ""}
+                {sizes.length > 0 && !selectedSize ? "une taille" : ""} avant d&apos;ajouter au panier
+              </p>
+            )}
+            {addToCart.error && (
+              <p className="text-[0.75rem] text-red-600 mt-3">{addToCart.error.message}</p>
+            )}
 
             <div className="mt-4 space-y-1">
               <p className="text-[0.75rem] text-[#666666]">Expedition sous 2-3 jours ouvres</p>

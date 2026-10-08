@@ -63,6 +63,9 @@ export const products = mysqlTable("products", {
   // Converti en kilos au moment de l'appel Sendcloud.
   weightGrams: int("weight_grams"),
   inventoryQuantity: int("inventoryQuantity").default(0),
+  // Stock par combinaison couleur x taille ("couleur|taille" -> quantite).
+  // inventoryQuantity en reste la somme.
+  variantStock: json("variant_stock").$type<Record<string, number>>(),
   collectionId: int("collectionId"),
   isActive: boolean("isActive").default(true),
   isFeatured: boolean("isFeatured").default(false),

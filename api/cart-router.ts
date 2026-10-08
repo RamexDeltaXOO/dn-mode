@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
+import { stockFor } from "@contracts/constants";
 import { createRouter, publicQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { carts, cartItems, products } from "@db/schema";
@@ -84,12 +85,32 @@ export const cartRouter = createRouter({
         cart = { id: Number(result[0].insertId), userId: userId || null, sessionId: sessionId || null };
       }
 
-      // Check if item already exists
+      // Meme produit, meme couleur, meme taille : on cumule sur la meme ligne.
+      const color = input.color || null;
+      const size = input.size || null;
       const existingItems = await db.select().from(cartItems)
-        .where(and(eq(cartItems.cartId, cart.id), eq(cartItems.productId, input.productId)));
+        .where(and(
+          eq(cartItems.cartId, cart.id),
+          eq(cartItems.productId, input.productId),
+          color === null ? isNull(cartItems.color) : eq(cartItems.color, color),
+          size === null ? isNull(cartItems.size) : eq(cartItems.size, size),
+        ));
+      const existing = existingItems[0];
 
-      if (existingItems.length > 0) {
-        const existing = existingItems[0];
+      // Stock de la variante choisie (couleur x taille).
+      const [product] = await db.select().from(products).where(eq(products.id, input.productId));
+      if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable" });
+      const available = stockFor(product, color, size);
+      if ((existing?.quantity ?? 0) + input.quantity > available) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: available > 0
+            ? `Plus que ${available} piece(s) disponible(s) pour cette variante`
+            : "Cette variante est epuisee",
+        });
+      }
+
+      if (existing) {
         await db.update(cartItems)
           .set({ quantity: existing.quantity + input.quantity })
           .where(eq(cartItems.id, existing.id));
@@ -98,8 +119,8 @@ export const cartRouter = createRouter({
           cartId: cart.id,
           productId: input.productId,
           quantity: input.quantity,
-          color: input.color || null,
-          size: input.size || null,
+          color,
+          size,
         });
       }
 
@@ -116,6 +137,17 @@ export const cartRouter = createRouter({
       if (input.quantity === 0) {
         await db.delete(cartItems).where(eq(cartItems.id, input.itemId));
       } else {
+        const [item] = await db.select().from(cartItems).where(eq(cartItems.id, input.itemId));
+        if (!item) throw new TRPCError({ code: "NOT_FOUND", message: "Article introuvable" });
+        const [product] = await db.select().from(products).where(eq(products.id, item.productId));
+        const available = product ? stockFor(product, item.color, item.size) : 0;
+        // Baisser la quantite reste toujours possible.
+        if (input.quantity > item.quantity && input.quantity > available) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Plus que ${available} piece(s) disponible(s) pour cette variante`,
+          });
+        }
         await db.update(cartItems).set({ quantity: input.quantity }).where(eq(cartItems.id, input.itemId));
       }
       return { success: true };

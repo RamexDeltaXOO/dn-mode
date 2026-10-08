@@ -15,6 +15,7 @@ import { getDb } from "../queries/connection";
 const ADDITIVE_COLUMNS: Array<{ table: string; column: string; definition: string }> = [
   { table: "products", column: "weight_grams", definition: "int NULL" },
   { table: "order_items", column: "weight_grams", definition: "int NULL" },
+  { table: "products", column: "variant_stock", definition: "json NULL" },
 ];
 
 function firstRow(result: unknown): Record<string, unknown> | undefined {

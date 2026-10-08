@@ -120,6 +120,9 @@ export default function CartDrawer({ open, onClose }: CartDrawerProps) {
                               Supprimer
                             </button>
                           </div>
+                          {updateItem.error && updateItem.variables?.itemId === item.id && (
+                            <p className="text-[0.625rem] text-red-600 mt-1">{updateItem.error.message}</p>
+                          )}
                         </div>
                       </>
                     )}
