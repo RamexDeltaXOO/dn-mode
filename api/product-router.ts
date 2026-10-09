@@ -24,7 +24,7 @@ export const productRouter = createRouter({
   list: publicQuery
     .input(
       z.object({
-        collectionId: z.number().optional(),
+        collectionId: z.number().optional().nullable(),
         featured: z.boolean().optional(),
         search: z.string().optional(),
         page: z.number().min(1).default(1),
@@ -112,7 +112,7 @@ export const productRouter = createRouter({
       weightGrams: z.number().int().min(0).optional().nullable(),
       inventoryQuantity: z.number().optional(),
       variantStock: z.record(z.string(), z.number().int().min(0)).optional().nullable(),
-      collectionId: z.number().optional(),
+      collectionId: z.number().optional().nullable(),
       isActive: z.boolean().optional(),
       isFeatured: z.boolean().optional(),
     }))
@@ -144,7 +144,7 @@ export const productRouter = createRouter({
       weightGrams: z.number().int().min(0).optional().nullable(),
       inventoryQuantity: z.number().optional(),
       variantStock: z.record(z.string(), z.number().int().min(0)).optional().nullable(),
-      collectionId: z.number().optional(),
+      collectionId: z.number().optional().nullable(),
       isActive: z.boolean().optional(),
       isFeatured: z.boolean().optional(),
     }))

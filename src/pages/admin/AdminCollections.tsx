@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { Pencil, Trash2, Plus, X } from "lucide-react";
+import { slugify } from "@contracts/constants";
 
 interface FormData {
   name: string;
@@ -28,7 +29,7 @@ export default function AdminCollections() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const data = { name: form.name, slug: form.slug || form.name.toLowerCase().replace(/\s+/g, "-"), description: form.description || undefined, image: form.image || undefined, sortOrder: parseInt(form.sortOrder) || 0 };
+    const data = { name: form.name, slug: form.slug || slugify(form.name), description: form.description || undefined, image: form.image || undefined, sortOrder: parseInt(form.sortOrder) || 0 };
     if (editingId) update.mutate({ id: editingId, ...data }); else create.mutate(data);
   };
 
@@ -38,6 +39,9 @@ export default function AdminCollections() {
         <h1 className="text-2xl font-light text-[#222222]">Collections</h1>
         <button onClick={openCreate} className="flex items-center gap-2 bg-[#222222] text-white px-4 py-2 text-[0.75rem] uppercase tracking-[1.5px]"><Plus size={14} /> Ajouter</button>
       </div>
+      <p className="text-[0.75rem] text-[#999999] mb-4">
+        Les collections s&apos;affichent dans le menu du site et sur la page des articles, dans l&apos;ordre indique (du plus petit au plus grand).
+      </p>
 
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-[300] flex items-center justify-center p-4">

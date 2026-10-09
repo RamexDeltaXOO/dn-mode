@@ -1,5 +1,7 @@
 import { Link } from "react-router";
 import { X, Instagram } from "lucide-react";
+import { trpc } from "@/providers/trpc";
+import { useSiteContent } from "@/hooks/useSiteContent";
 
 interface NavDrawerProps {
   open: boolean;
@@ -7,17 +9,12 @@ interface NavDrawerProps {
 }
 
 export default function NavDrawer({ open, onClose }: NavDrawerProps) {
+  // Collections gerees dans le CRM, dans l'ordre choisi la-bas.
+  const { data: collections } = trpc.collection.list.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
+  const { instagramUrl } = useSiteContent();
   const navLinks = [
-    { name: "T-shirts / Tops", slug: "t-shirts-tops" },
-    { name: "Chemises / Hauts", slug: "chemises-hauts" },
-    { name: "Sweats / Pulls", slug: "sweats-pulls" },
-    { name: "Robes", slug: "robes" },
-    { name: "Jupes", slug: "jupes" },
-    { name: "Ensembles", slug: "ensembles" },
-    { name: "Gilets / Vestes", slug: "gilets-vestes" },
-    { name: "Manteaux", slug: "manteaux" },
-    { name: "Hijabs", slug: "hijabs" },
-    { name: "Burkini", slug: "burkini" },
+    { name: "Tous les articles", slug: "all" },
+    ...(collections ?? []).map((c) => ({ name: c.name, slug: c.slug })),
   ];
 
   return (
@@ -66,7 +63,7 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
               Se connecter
             </Link>
             <div className="flex gap-3 mt-4">
-              <a href="https://www.instagram.com" target="_blank" rel="noopener noreferrer" className="hover:opacity-60">
+              <a href={instagramUrl} target="_blank" rel="noopener noreferrer" className="hover:opacity-60">
                 <Instagram size={18} strokeWidth={1.5} />
               </a>
             </div>

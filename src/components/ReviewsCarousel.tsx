@@ -6,7 +6,7 @@ import { trpc } from "@/providers/trpc";
  * Avis clients saisis dans le CRM, en carrousel horizontal : glisser au doigt
  * sur mobile, fleches et points sur desktop. Rien n'est affiche sans avis.
  */
-export default function ReviewsCarousel() {
+export default function ReviewsCarousel({ title }: { title: string }) {
   const { data: reviews } = trpc.review.list.useQuery(undefined, { staleTime: 5 * 60 * 1000, retry: false });
   const trackRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
@@ -38,7 +38,7 @@ export default function ReviewsCarousel() {
   return (
     <section className="bg-white py-16 sm:py-24">
       <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="section-label text-center mb-10">Avis clients</h2>
+        <h2 className="section-label text-center mb-10">{title}</h2>
 
         <div className="relative">
           <div

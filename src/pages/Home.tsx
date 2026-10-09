@@ -1,7 +1,9 @@
 import { useEffect, useRef } from "react";
 import { Link } from "react-router";
 import { trpc } from "@/providers/trpc";
-import { HomeImageDefaults } from "@contracts/constants";
+import { HomeImageDefaults, collectionHref } from "@contracts/constants";
+import { useSiteContent } from "@/hooks/useSiteContent";
+import RichText from "@/components/RichText";
 import gsap from "gsap";
 import ReviewsCarousel from "@/components/ReviewsCarousel";
 
@@ -22,6 +24,9 @@ export default function Home() {
   });
   const heroImage = homeImages?.hero ?? (homeImagesError ? HomeImageDefaults.hero : undefined);
   const lookImage = homeImages?.look ?? (homeImagesError ? HomeImageDefaults.look : undefined);
+
+  // Textes et liens choisis dans le CRM (Parametres > Textes du site).
+  const { texts } = useSiteContent();
 
   // Track page view
   const trackView = trpc.analytics.trackPageView.useMutation();
@@ -82,10 +87,10 @@ export default function Home() {
         )}
         <div className="relative z-10 text-center px-6">
           <Link
-            to="/collections/all"
+            to={collectionHref(texts.heroCollection)}
             className="hero-headline opacity-0 translate-y-4 inline-block bg-white text-[#121212] text-[0.75rem] sm:text-[0.8125rem] uppercase tracking-[3px] font-medium px-8 py-4 hover:bg-[#121212] hover:text-white border border-white transition-colors duration-300"
           >
-            Nouvelle collection
+            {texts.heroButton}
           </Link>
           {/* <p
             className="hero-subline opacity-0 translate-y-4 text-white/60 text-base sm:text-lg mt-3 tracking-[0.5px]"
@@ -107,9 +112,7 @@ export default function Home() {
             <img src="/logo-dnmode.png" alt="DN MODE" className="h-24 sm:h-28 w-auto mx-auto" />
           </div> */}
           <p className="animate-in opacity-0 translate-y-5 text-[0.9375rem] text-black font-bold leading-[1.6]">
-            DN MODE votre{" "}
-            <em className="font-['Playfair_Display'] italic">style</em> notre{" "}
-            <em className="font-['Playfair_Display'] italic">identité</em>.
+            <RichText text={texts.brandText} />
           </p>
           {/* <p className="animate-in opacity-0 translate-y-5 text-[0.8125rem] text-[#999999] tracking-[3px] uppercase mt-8">
             Production <strong className="text-[#222222] font-medium">Ethique</strong>
@@ -155,10 +158,10 @@ export default function Home() {
 
           <div className="animate-in opacity-0 translate-y-5 text-center mt-10">
             <Link
-              to="/collections/ensembles"
+              to={collectionHref(texts.productsCollection)}
               className="text-[0.6875rem] uppercase tracking-[2px] text-[#222222] border-b border-[#222222] pb-0.5 hover:opacity-60 transition-opacity"
             >
-              TOUT
+              {texts.productsLink}
             </Link>
           </div>
         </div>
@@ -177,10 +180,10 @@ export default function Home() {
             )}
             <div className="absolute inset-0 flex items-center justify-center">
               <Link
-                to="/collections/look-du-moment"
+                to={collectionHref(texts.lookCollection)}
                 className="bg-white text-[#222222] px-7 py-3 text-[0.75rem] uppercase tracking-[2px] hover:bg-[#222222] hover:text-white transition-colors"
               >
-                LOOK DU MOMENT
+                {texts.lookButton}
               </Link>
             </div>
           </div>
@@ -188,7 +191,7 @@ export default function Home() {
       </section>
 
       {/* Avis clients */}
-      <ReviewsCarousel />
+      <ReviewsCarousel title={texts.reviewsTitle} />
     </div>
   );
 }

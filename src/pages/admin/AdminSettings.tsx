@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/providers/trpc";
-import { Save, Check, CreditCard, Mail, Globe, Truck, Copy, Image, LayoutTemplate } from "lucide-react";
-import { HomeImageDefaults, Paths, Shipping } from "@contracts/constants";
+import { Save, Check, CreditCard, Mail, Globe, Truck, Copy, Image, LayoutTemplate, Type } from "lucide-react";
+import { HomeImageDefaults, HomeTextDefaults, Paths, Shipping } from "@contracts/constants";
 import SingleImageUploader from "@/components/admin/SingleImageUploader";
 
 type FieldProps = {
@@ -29,6 +29,43 @@ function Field({ label, value, onChange, type = "text", placeholder }: FieldProp
           className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222]"
         />
       </div>
+    </div>
+  );
+}
+
+const TEXT_KEYS = [
+  "home_hero_button",
+  "home_hero_collection",
+  "home_brand_text",
+  "home_products_link",
+  "home_products_collection",
+  "home_look_button",
+  "home_look_collection",
+  "home_reviews_title",
+  "banner_messages",
+] as const;
+
+function CollectionSelect({ label, value, onChange, collections }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  collections: Array<{ slug: string; name: string }>;
+}) {
+  const known = value === "all" || collections.some((c) => c.slug === value);
+  return (
+    <div>
+      <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1.5">{label}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222] bg-white"
+      >
+        <option value="all">Tous les articles</option>
+        {collections.map((c) => (
+          <option key={c.slug} value={c.slug}>{c.name}</option>
+        ))}
+        {!known && <option value={value}>{value} (introuvable)</option>}
+      </select>
     </div>
   );
 }
@@ -70,6 +107,16 @@ const EMPTY_FORM = {
   // Page d'accueil (vide = image par defaut)
   home_hero_image: "",
   home_look_image: "",
+  // Textes du site (pre-remplis avec les textes actuels)
+  home_hero_button: HomeTextDefaults.heroButton as string,
+  home_hero_collection: HomeTextDefaults.heroCollection as string,
+  home_brand_text: HomeTextDefaults.brandText as string,
+  home_products_link: HomeTextDefaults.productsLink as string,
+  home_products_collection: HomeTextDefaults.productsCollection as string,
+  home_look_button: HomeTextDefaults.lookButton as string,
+  home_look_collection: HomeTextDefaults.lookCollection as string,
+  home_reviews_title: HomeTextDefaults.reviewsTitle as string,
+  banner_messages: HomeTextDefaults.bannerMessages as string,
   // Stripe
   stripe_publishable_key: "",
   stripe_secret_key: "",
@@ -134,6 +181,7 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
     onSuccess: () => {
       utils.config.list.invalidate();
       utils.config.homeImages.invalidate();
+      utils.config.siteContent.invalidate();
     },
   });
   const [saved, setSaved] = useState<string | null>(null);
@@ -147,6 +195,7 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
   });
 
   const { data: storageStatus } = trpc.upload.status.useQuery(undefined, { retry: false });
+  const { data: collections } = trpc.collection.list.useQuery();
   const { data: emailStatus } = trpc.email.status.useQuery(undefined, { retry: false });
   const seedTemplates = trpc.email.seedDefaults.useMutation({
     onSuccess: () => utils.email.listTemplates.invalidate(),
@@ -161,6 +210,16 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
         setTimeout(() => setSaved(null), 1500);
       },
     });
+  };
+
+  const handleSaveTexts = async () => {
+    try {
+      await Promise.all(TEXT_KEYS.map((key) => setConfig.mutateAsync({ key, value: form[key] })));
+      setSaved("texts");
+    } catch {
+      setSaved("texts-error");
+    }
+    setTimeout(() => setSaved(null), 1500);
   };
 
   const handleSaveAll = () => {
@@ -252,6 +311,50 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
               <p className="text-[0.6875rem] text-[#999999]">
                 Une image envoyee est enregistree aussitot. Une URL collee a la main s&apos;enregistre avec ce bouton.
               </p>
+            </div>
+          </div>
+
+          {/* Textes du site */}
+          <div className="bg-white shadow-sm border border-[#e8e8e8] p-6">
+            <SectionHeader icon={Type} title="Textes du site" />
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Bouton du bandeau principal" value={form.home_hero_button} onChange={(v) => setForm({ ...form, home_hero_button: v })} placeholder={HomeTextDefaults.heroButton} />
+                <CollectionSelect label="Il mene vers" value={form.home_hero_collection} onChange={(v) => setForm({ ...form, home_hero_collection: v })} collections={collections ?? []} />
+              </div>
+              <div>
+                <Field label="Phrase de la marque" value={form.home_brand_text} onChange={(v) => setForm({ ...form, home_brand_text: v })} placeholder={HomeTextDefaults.brandText} />
+                <p className="text-[0.625rem] text-[#999999] mt-1">Les mots entre *etoiles* s&apos;affichent en italique, par exemple : votre *style* notre *identite*.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Lien sous les produits" value={form.home_products_link} onChange={(v) => setForm({ ...form, home_products_link: v })} placeholder={HomeTextDefaults.productsLink} />
+                <CollectionSelect label="Il mene vers" value={form.home_products_collection} onChange={(v) => setForm({ ...form, home_products_collection: v })} collections={collections ?? []} />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Bouton « Look du moment »" value={form.home_look_button} onChange={(v) => setForm({ ...form, home_look_button: v })} placeholder={HomeTextDefaults.lookButton} />
+                <CollectionSelect label="Il mene vers" value={form.home_look_collection} onChange={(v) => setForm({ ...form, home_look_collection: v })} collections={collections ?? []} />
+              </div>
+              <Field label="Titre des avis clients" value={form.home_reviews_title} onChange={(v) => setForm({ ...form, home_reviews_title: v })} placeholder={HomeTextDefaults.reviewsTitle} />
+              <div>
+                <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1.5">Messages du bandeau defilant</label>
+                <textarea
+                  value={form.banner_messages}
+                  onChange={(e) => setForm({ ...form, banner_messages: e.target.value })}
+                  rows={3}
+                  className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222] resize-y"
+                />
+                <p className="text-[0.625rem] text-[#999999] mt-1">
+                  Un message par ligne. Ils suivent le message de livraison offerte, qui se regle avec le seuil ci-dessus.
+                </p>
+              </div>
+              <button
+                onClick={handleSaveTexts}
+                disabled={setConfig.isPending}
+                className="text-[0.625rem] uppercase tracking-[1px] border border-[#e0e0e0] px-3 py-1.5 hover:border-[#222222] disabled:opacity-50"
+              >
+                {saved === "texts" ? "OK" : saved === "texts-error" ? "Erreur, reessayer" : "Enregistrer les textes"}
+              </button>
+              <p className="text-[0.625rem] text-[#999999]">Un champ vide remet le texte par defaut.</p>
             </div>
           </div>
 

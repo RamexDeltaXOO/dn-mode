@@ -67,7 +67,42 @@ export const ConfigKeys = {
 
   homeHeroImage: "home_hero_image",
   homeLookImage: "home_look_image",
+
+  homeHeroButton: "home_hero_button",
+  homeHeroCollection: "home_hero_collection",
+  homeBrandText: "home_brand_text",
+  homeProductsLink: "home_products_link",
+  homeProductsCollection: "home_products_collection",
+  homeLookButton: "home_look_button",
+  homeLookCollection: "home_look_collection",
+  homeReviewsTitle: "home_reviews_title",
+  bannerMessages: "banner_messages",
 } as const;
+
+// ── Textes du site modifiables depuis le CRM ────────────────
+// Une valeur vide dans le CRM revient a ces textes. Les collections sont
+// designees par leur slug, "all" signifiant tous les articles.
+export const HomeTextDefaults = {
+  heroButton: "Nouvelle collection",
+  heroCollection: "all",
+  // Les mots entre *etoiles* s'affichent en italique.
+  brandText: "DN MODE votre *style* notre *identité*.",
+  productsLink: "Tout",
+  productsCollection: "all",
+  lookButton: "Look du moment",
+  lookCollection: "look-du-moment",
+  reviewsTitle: "Avis clients",
+  // Un message par ligne, apres celui de la livraison offerte.
+  bannerMessages: "Paiement securise\nNi echange ni remboursement",
+} as const;
+
+export type HomeTexts = { [K in keyof typeof HomeTextDefaults]: string };
+
+/** Lien vers une collection par son slug ("all" ou vide : tous les articles). */
+export function collectionHref(slug: string | null | undefined): string {
+  const s = (slug ?? "").trim();
+  return `/collections/${s === "" ? "all" : s}`;
+}
 
 // ── Visuels de la page d'accueil ────────────────────────────
 // Images livrees avec le site, affichees tant qu'aucune autre n'est
@@ -166,4 +201,14 @@ export function stockFor(
   const vs = product.variantStock;
   if (vs && Object.keys(vs).length > 0) return vs[variantKey(color, size)] ?? 0;
   return product.inventoryQuantity ?? 0;
+}
+
+/** Slug d'URL : "T-shirts / Tops été" -> "t-shirts-tops-ete". */
+export function slugify(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }

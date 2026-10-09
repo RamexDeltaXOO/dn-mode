@@ -2,7 +2,7 @@ import { useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { Pencil, Trash2, Plus, Search, X } from "lucide-react";
 import ImageUploader from "@/components/admin/ImageUploader";
-import { variantKey, variantKeys } from "@contracts/constants";
+import { slugify, variantKey, variantKeys } from "@contracts/constants";
 
 interface ProductForm {
   name: string;
@@ -130,7 +130,7 @@ export default function AdminProducts() {
       : null;
     const data = {
       name: form.name,
-      slug: form.slug || form.name.toLowerCase().replace(/\s+/g, "-"),
+      slug: form.slug || slugify(form.name),
       price: form.price,
       description: form.description || undefined,
       shortDescription: form.shortDescription || undefined,
@@ -140,7 +140,7 @@ export default function AdminProducts() {
       weightGrams: form.weightGrams.trim() === "" ? null : parseInt(form.weightGrams, 10) || 0,
       inventoryQuantity: hasVariants ? variantTotal : parseInt(form.inventoryQuantity) || 0,
       variantStock,
-      collectionId: form.collectionId ? parseInt(form.collectionId) : undefined,
+      collectionId: form.collectionId ? parseInt(form.collectionId) : null,
       isActive: form.isActive,
       isFeatured: form.isFeatured,
     };

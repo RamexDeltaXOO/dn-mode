@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { Instagram } from "lucide-react";
 import { trpc } from "@/providers/trpc";
+import { useSiteContent } from "@/hooks/useSiteContent";
 
 const PAYMENT_METHODS = [
   "AMEX",
@@ -15,6 +16,7 @@ const PAYMENT_METHODS = [
 
 export default function Footer() {
   const [email, setEmail] = useState("");
+  const { instagramUrl } = useSiteContent();
   const [subscribed, setSubscribed] = useState(false);
   const subscribe = trpc.newsletter.subscribe.useMutation({
     onSuccess: () => {
@@ -56,7 +58,7 @@ export default function Footer() {
               </form>
             )}
             <div className="flex gap-3 mt-4">
-              <a href="https://www.instagram.com" target="_blank" rel="noopener noreferrer" className="hover:opacity-60">
+              <a href={instagramUrl} target="_blank" rel="noopener noreferrer" className="hover:opacity-60">
                 <Instagram size={20} strokeWidth={1.5} />
               </a>
             </div>

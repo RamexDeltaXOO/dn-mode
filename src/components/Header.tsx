@@ -4,14 +4,13 @@ import { Menu, Search, ShoppingBag, User } from "lucide-react";
 import { Shipping, freeShippingBanner } from "@contracts/constants";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/providers/trpc";
+import { useSiteContent } from "@/hooks/useSiteContent";
 
 interface HeaderProps {
   onCartOpen: () => void;
   onSearchOpen: () => void;
   onNavOpen: () => void;
 }
-
-const SECONDARY_MESSAGES = ["Paiement securise", "Ni echange ni remboursement"];
 
 /** Une sequence complete du bandeau, dupliquee pour une boucle sans couture. */
 function MarqueeSequence({ messages }: { messages: string[] }) {
@@ -48,7 +47,10 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
   const banner = shippingSettings?.banner ?? freeShippingBanner();
   const threshold = shippingSettings?.threshold ?? Shipping.freeThreshold;
   // Repete pour que la sequence couvre toute la largeur d'un ecran desktop.
-  const marqueeMessages = Array.from({ length: 4 }, () => [banner, ...SECONDARY_MESSAGES]).flat();
+  // Messages du bandeau saisis dans le CRM, un par ligne.
+  const { texts } = useSiteContent();
+  const secondaryMessages = texts.bannerMessages.split("\n").map((m) => m.trim()).filter(Boolean);
+  const marqueeMessages = Array.from({ length: 4 }, () => [banner, ...secondaryMessages]).flat();
 
   useEffect(() => {
     const handleScroll = () => {

@@ -1,24 +1,29 @@
 import { useParams, Link } from "react-router";
 import { trpc } from "@/providers/trpc";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import gsap from "gsap";
 
 export default function CollectionPage() {
   const { slug } = useParams<{ slug: string }>();
   const gridRef = useRef<HTMLDivElement>(null);
 
-  const { data: collections } = trpc.collection.list.useQuery();
+  const { data: collections, isLoading: collectionsLoading } = trpc.collection.list.useQuery();
 
-  // Get current collection from slug
+  const isAll = !slug || slug === "all";
   const currentCollection = collections?.find(c => c.slug === slug);
   const collectionId = currentCollection?.id;
+  // Collection supprimee ou renommee dans le CRM : on ne montre pas tout le
+  // catalogue sous son nom.
+  const notFound = !isAll && !collectionsLoading && !currentCollection;
 
-  // Use the backend filter by collectionId
+  // On attend de connaitre la collection pour ne pas afficher tout le
+  // catalogue le temps du chargement.
   const { data: productsData } = trpc.product.list.useQuery(
-    collectionId ? { collectionId, page: 1, limit: 100 } : { page: 1, limit: 100 }
+    collectionId ? { collectionId, page: 1, limit: 100 } : { page: 1, limit: 100 },
+    { enabled: isAll || !!collectionId },
   );
 
-  const products = productsData?.products || [];
+  const products = useMemo(() => (notFound ? [] : productsData?.products ?? []), [notFound, productsData]);
 
   useEffect(() => {
     if (gridRef.current && products.length > 0) {
@@ -30,7 +35,7 @@ export default function CollectionPage() {
     }
   }, [products, slug]);
 
-  const title = currentCollection?.name || (slug && slug !== "all" ? slug.replace(/-/g, " ") : "Tous les articles");
+  const title = currentCollection?.name || (isAll ? "Tous les articles" : notFound ? "Collection introuvable" : "");
 
   return (
     <div className="pt-[92px] min-h-[100dvh]">
@@ -66,7 +71,9 @@ export default function CollectionPage() {
           {/* Products */}
           <div className="flex-1">
             <h1 className="text-xl sm:text-2xl font-light text-[#222222] mb-2 capitalize">{title}</h1>
-            <p className="text-[0.8125rem] text-[#666666] mb-6">{products.length} article{products.length !== 1 ? "s" : ""}</p>
+            {!notFound && (
+              <p className="text-[0.8125rem] text-[#666666] mb-6">{products.length} article{products.length !== 1 ? "s" : ""}</p>
+            )}
 
             <div ref={gridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {products.map((product) => (
@@ -97,9 +104,16 @@ export default function CollectionPage() {
               ))}
             </div>
 
-            {products.length === 0 && (
+            {(notFound || (productsData && products.length === 0)) && (
               <div className="text-center py-20">
-                <p className="text-[0.9375rem] text-[#999999]">Aucun article dans cette collection</p>
+                <p className="text-[0.9375rem] text-[#999999]">
+                  {notFound ? "Cette collection n'existe pas ou plus." : "Aucun article dans cette collection"}
+                </p>
+                {notFound && (
+                  <Link to="/collections/all" className="inline-block mt-4 text-[0.75rem] uppercase tracking-[2px] underline">
+                    Voir tous les articles
+                  </Link>
+                )}
               </div>
             )}
           </div>

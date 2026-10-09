@@ -3,7 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { siteConfig } from "@db/schema";
-import { ConfigKeys, HomeImageDefaults } from "@contracts/constants";
+import { ConfigKeys, HomeImageDefaults, HomeTextDefaults, type HomeTexts } from "@contracts/constants";
 import { getConfigValues } from "./lib/site-config";
 
 export const configRouter = createRouter({
@@ -23,6 +23,35 @@ export const configRouter = createRouter({
     return {
       hero: values[ConfigKeys.homeHeroImage]?.trim() || HomeImageDefaults.hero,
       look: values[ConfigKeys.homeLookImage]?.trim() || HomeImageDefaults.look,
+    };
+  }),
+
+  /**
+   * Textes du site modifiables depuis le CRM (accueil, bandeau) et lien
+   * Instagram. Liste blanche : rien d'autre de la configuration ne sort.
+   */
+  siteContent: publicQuery.query(async () => {
+    const textKeys: Record<keyof HomeTexts, string> = {
+      heroButton: ConfigKeys.homeHeroButton,
+      heroCollection: ConfigKeys.homeHeroCollection,
+      brandText: ConfigKeys.homeBrandText,
+      productsLink: ConfigKeys.homeProductsLink,
+      productsCollection: ConfigKeys.homeProductsCollection,
+      lookButton: ConfigKeys.homeLookButton,
+      lookCollection: ConfigKeys.homeLookCollection,
+      reviewsTitle: ConfigKeys.homeReviewsTitle,
+      bannerMessages: ConfigKeys.bannerMessages,
+    };
+    const values = await getConfigValues([...Object.values(textKeys), ConfigKeys.instagramUrl]);
+    const texts = Object.fromEntries(
+      (Object.keys(textKeys) as Array<keyof HomeTexts>).map((k) => [
+        k,
+        values[textKeys[k]]?.trim() || HomeTextDefaults[k],
+      ]),
+    ) as HomeTexts;
+    return {
+      texts,
+      instagramUrl: values[ConfigKeys.instagramUrl]?.trim() || "https://www.instagram.com",
     };
   }),
 

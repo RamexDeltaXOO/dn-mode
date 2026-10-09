@@ -28,3 +28,13 @@ describe("chemin JSON des variantes", () => {
     expect(variantJsonPath("a\\b|")).toBe('$."a\\\\b|"');
   });
 });
+
+describe("liens et slugs de collection", () => {
+  it("genere un slug propre", async () => {
+    const { slugify, collectionHref } = await import("@contracts/constants");
+    expect(slugify("T-shirts / Tops")).toBe("t-shirts-tops");
+    expect(slugify("  Été 2026 !")).toBe("ete-2026");
+    expect(collectionHref("")).toBe("/collections/all");
+    expect(collectionHref("robes")).toBe("/collections/robes");
+  });
+});
