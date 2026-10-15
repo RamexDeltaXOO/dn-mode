@@ -9,7 +9,10 @@ import { inspectAttr } from 'kimi-plugin-inspect-react'
 export default defineConfig({
   plugins: [
     devServer({ entry: "api/boot.ts", exclude: [/^\/(?!api\/|robots\.txt$|sitemap\.xml$).*$/] }),
-    inspectAttr(), react()],
+    // Repere de code source sur chaque element, utile en developpement
+    // seulement : en production il alourdissait le site de 1 400 attributs.
+    { ...inspectAttr(), apply: "serve" },
+    react()],
   server: {
     port: 3000,
   },
@@ -25,5 +28,20 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // Bibliotheques qui changent rarement : un fichier a part, garde en
+        // cache par le navigateur d'un deploiement a l'autre.
+        manualChunks(id) {
+          if (
+            /node_modules\/(react|react-dom|scheduler|react-router|@tanstack|@trpc|superjson|copy-anything|is-what)\//.test(
+              id,
+            )
+          ) {
+            return "vendor";
+          }
+        },
+      },
+    },
   },
 });

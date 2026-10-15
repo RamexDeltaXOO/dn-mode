@@ -22,6 +22,8 @@ export function serveStaticFiles(app: App) {
     "*",
     serveStatic({
       root: "./dist/public",
+      // Versions .br / .gz produites au build par scripts/precompress.mjs.
+      precompressed: true,
       onFound: (filePath, c) => {
         // Les fichiers de /assets portent un hash dans leur nom : un an de
         // cache sans risque. Les autres (logo, visuels) changent rarement.

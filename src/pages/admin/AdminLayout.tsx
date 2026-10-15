@@ -1,5 +1,6 @@
 import { Outlet, Link, useLocation } from "react-router";
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
+import PageLoader from "@/components/PageLoader";
 import { useNavigate } from "react-router";
 import {
   LayoutDashboard,
@@ -100,7 +101,9 @@ export default function AdminLayout() {
       {/* Main Content */}
       <div className="ml-[250px] flex-1 min-h-[100dvh]">
         <div className="p-6 sm:p-8">
-          <Outlet />
+          <Suspense fallback={<PageLoader className="min-h-[50vh]" />}>
+            <Outlet />
+          </Suspense>
         </div>
       </div>
     </div>

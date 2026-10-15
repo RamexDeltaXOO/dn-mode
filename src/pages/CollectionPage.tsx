@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import gsap from "gsap";
 import { collectionSeo, pageTitle } from "@contracts/seo";
 import { useSeo } from "@/hooks/useSeo";
+import PageLoader from "@/components/PageLoader";
 
 export default function CollectionPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -35,7 +36,7 @@ export default function CollectionPage() {
         { opacity: 1, y: 0, duration: 0.6, stagger: 0.08, ease: "power2.out" }
       );
     }
-  }, [products, slug]);
+  }, [products, slug, collectionsLoading]);
 
   const title = currentCollection?.name || (isAll ? "Tous les articles" : notFound ? "Collection introuvable" : "");
 
@@ -47,6 +48,10 @@ export default function CollectionPage() {
             ? { title: pageTitle("Collection introuvable", site.siteName), noindex: true }
             : collectionSeo(currentCollection ?? null, site.siteName),
   );
+
+  // Sur mobile, la liste des collections est au-dessus des produits : l'afficher
+  // vide puis remplie poussait toute la grille vers le bas.
+  if (collectionsLoading) return <PageLoader />;
 
   return (
     <div className="pt-[92px] min-h-[100dvh]">

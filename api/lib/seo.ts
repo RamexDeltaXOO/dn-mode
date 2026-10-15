@@ -88,6 +88,11 @@ export type PageMeta = {
   image?: string;
   imageAlt?: string;
   product?: { price: string; inStock: boolean };
+  /**
+   * Image principale affichee par la page (souvent le "Largest Contentful
+   * Paint") : prechargee des le HTML, sans attendre que React l'affiche.
+   */
+  preloadImage?: string;
   jsonLd: JsonLd[];
   /** Contenu de secours (HTML) pour les robots qui n'executent pas le JavaScript. */
   fallback: string;
@@ -182,6 +187,7 @@ async function homePage(settings: SeoSettings): Promise<PageMeta> {
     type: "website",
     image: settings.heroImage,
     imageAlt: settings.siteName,
+    preloadImage: settings.heroImage,
     jsonLd: [
       {
         "@context": "https://schema.org",
@@ -241,6 +247,7 @@ async function collectionPage(slug: string, settings: SeoSettings): Promise<Page
     type: "website",
     image: collection?.image || items[0]?.images?.[0] || settings.heroImage,
     imageAlt: name,
+    preloadImage: items[0]?.images?.[0] || undefined,
     jsonLd: [breadcrumb(settings.baseUrl, [{ name: "Accueil", path: "/" }, { name, path }])],
     fallback: fallbackHtml({
       title: name,
@@ -282,6 +289,7 @@ async function productPage(slug: string, settings: SeoSettings): Promise<PageMet
     type: "product",
     image: images[0] ?? settings.heroImage,
     imageAlt: product.name,
+    preloadImage: product.images?.[0] || undefined,
     product: { price, inStock },
     jsonLd: [
       {
@@ -367,6 +375,13 @@ export function renderHeadTags(page: PageMeta, settings: SeoSettings): string {
     `<title>${escapeHtml(page.title)}</title>`,
     meta("name", "description", page.description),
   ];
+  if (page.preloadImage) {
+    // Adresse telle que la page l'affichera, pour que le navigateur la
+    // reutilise au lieu de la telecharger deux fois.
+    tags.push(
+      `<link rel="preload" as="image" href="${escapeHtml(page.preloadImage)}" fetchpriority="high" data-seo-path="${escapeHtml(page.path)}" />`,
+    );
+  }
 
   if (page.noindex || page.status !== 200) {
     tags.push(meta("name", "robots", "noindex, nofollow"));

@@ -1,5 +1,6 @@
 import { Outlet } from "react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import PageLoader from "./PageLoader";
 import Header from "./Header";
 import Footer from "./Footer";
 import CartDrawer from "./CartDrawer";
@@ -28,7 +29,10 @@ export default function Layout() {
         onNavOpen={() => setNavOpen(true)}
       />
       <main className="flex-1">
-        <Outlet />
+        {/* En-tete et pied de page restent affiches pendant le chargement d'une page */}
+        <Suspense fallback={<PageLoader />}>
+          <Outlet />
+        </Suspense>
       </main>
       <Footer />
 

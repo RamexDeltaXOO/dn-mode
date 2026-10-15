@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { HomeImageDefaults, collectionHref } from "@contracts/constants";
@@ -24,7 +24,16 @@ export default function Home() {
   const { data: homeImages, isError: homeImagesError } = trpc.config.homeImages.useQuery(undefined, {
     staleTime: 5 * 60 * 1000,
   });
-  const heroImage = homeImages?.hero ?? (homeImagesError ? HomeImageDefaults.hero : undefined);
+  // A l'arrivee sur le site, le serveur a deja choisi et precharge le visuel
+  // (api/lib/seo.ts) : on l'affiche sans attendre la reponse de l'API.
+  const [serverHero] = useState(
+    () =>
+      document.head
+        .querySelector('link[rel="preload"][as="image"][data-seo-path="/"]')
+        ?.getAttribute("href") ?? undefined,
+  );
+  const heroImage =
+    homeImages?.hero ?? serverHero ?? (homeImagesError ? HomeImageDefaults.hero : undefined);
   const lookImage = homeImages?.look ?? (homeImagesError ? HomeImageDefaults.look : undefined);
 
   // Textes et liens choisis dans le CRM (Parametres > Textes du site).
@@ -73,6 +82,7 @@ export default function Home() {
   }, [featuredProducts, allProducts]);
 
   const displayProducts = featuredProducts?.products || allProducts?.products || [];
+  const productsLoading = !featuredProducts && !allProducts;
 
   return (
     <div>
@@ -134,6 +144,15 @@ export default function Home() {
           </p> */}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {/* Emplacements reserves pendant le chargement : sans eux, l'arrivee
+                des produits repoussait d'un coup la suite de la page. */}
+            {productsLoading &&
+              Array.from({ length: 3 }, (_, i) => (
+                <div key={i} aria-hidden="true">
+                  <div className="aspect-[3/4] bg-[#eaeaea]" />
+                  <div className="h-[3.25rem]" />
+                </div>
+              ))}
             {displayProducts.map((product) => (
               <Link
                 key={product.id}
@@ -164,14 +183,17 @@ export default function Home() {
             ))}
           </div>
 
-          <div className="animate-in opacity-0 translate-y-5 text-center mt-10">
-            <Link
-              to={collectionHref(texts.productsCollection)}
-              className="text-[0.6875rem] uppercase tracking-[2px] text-[#222222] border-b border-[#222222] pb-0.5 hover:opacity-60 transition-opacity"
-            >
-              {texts.productsLink}
-            </Link>
-          </div>
+          {/* Affiche avec les produits : seul, il serait pousse vers le bas a leur arrivee */}
+          {!productsLoading && (
+            <div className="animate-in opacity-0 translate-y-5 text-center mt-10">
+              <Link
+                to={collectionHref(texts.productsCollection)}
+                className="text-[0.6875rem] uppercase tracking-[2px] text-[#222222] border-b border-[#222222] pb-0.5 hover:opacity-60 transition-opacity"
+              >
+                {texts.productsLink}
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 

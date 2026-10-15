@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { compress } from "hono/compress";
 import type { HttpBindings } from "@hono/node-server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "./router";
@@ -15,6 +16,10 @@ import { Paths } from "@contracts/constants";
 const app = new Hono<{ Bindings: HttpBindings }>();
 
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
+// Pages HTML, reponses de l'API et sitemap compresses a la volee. Les
+// fichiers statiques arrivent deja compresses (precompressed) et les images
+// ne sont pas concernees.
+app.use(compress());
 // Connexion via Gmail (Google OAuth 2.0)
 app.get(Paths.googleAuthCallback, createGoogleCallbackHandler());
 // Upload des images produits (multipart, hors tRPC)

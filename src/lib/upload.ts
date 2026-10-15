@@ -2,11 +2,15 @@ import { Paths, UPLOAD_MAX_BYTES } from "@contracts/constants";
 
 export const UPLOAD_MAX_MB = Math.round(UPLOAD_MAX_BYTES / (1024 * 1024));
 
-/** Cote le plus long d'une photo apres reduction, en pixels. */
-const MAX_DIMENSION = 2000;
+/**
+ * Cote le plus long d'une photo apres reduction, en pixels. La plus grande
+ * image affichee (fiche produit) occupe environ 1200 pixels reels sur un
+ * ecran haute densite : au-dela, le poids augmente sans gain visible.
+ */
+const MAX_DIMENSION = 1600;
 
 /**
- * Reduit une photo avant l'envoi : 2000 px de cote au plus, reencodee en
+ * Reduit une photo avant l'envoi : 1600 px de cote au plus, reencodee en
  * WebP (en JPEG si le navigateur ne sait pas produire de WebP). Une photo de
  * telephone de 5 Mo descend ainsi a quelques centaines de Ko, ce qui allege
  * le stockage et l'affichage de la boutique. En cas d'echec, ou si le

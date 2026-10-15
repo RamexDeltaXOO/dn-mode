@@ -5,6 +5,7 @@ import { trpc } from "@/providers/trpc";
 import { ChevronLeft, ShoppingBag, Check } from "lucide-react";
 import { pageTitle, productSeo } from "@contracts/seo";
 import { useSeo } from "@/hooks/useSeo";
+import PageLoader from "@/components/PageLoader";
 
 export default function ProductPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -58,13 +59,9 @@ export default function ProductPage() {
             : { title: pageTitle("Produit introuvable", site.siteName), noindex: true },
   );
 
-  if (isLoading) {
-    return (
-      <div className="pt-[92px] min-h-[100dvh] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#222222] border-t-transparent animate-spin" />
-      </div>
-    );
-  }
+  // Composant a part : React ne recycle pas le spinner en bloc produit, ce
+  // que le navigateur comptait comme un decalage de mise en page.
+  if (isLoading) return <PageLoader />;
 
   if (!product) {
     return (

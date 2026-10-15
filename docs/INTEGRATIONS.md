@@ -103,7 +103,7 @@ unique et une reponse cachee un an : le CDN d'App Hosting les garde en cache
 et la base n'est presque jamais relue. Suffisant pour quelques centaines de
 photos.
 
-Avant l'envoi, le navigateur reduit chaque photo a 2000 px de cote et la
+Avant l'envoi, le navigateur reduit chaque photo a 1600 px de cote et la
 reencode en WebP (JPEG sur les navigateurs qui ne savent pas produire de
 WebP). Une photo de telephone de plusieurs Mo descend ainsi a quelques
 centaines de Ko, ce qui allege la base et accelere la boutique.

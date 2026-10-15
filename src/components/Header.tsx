@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { Menu, Search, ShoppingBag, User } from "lucide-react";
 import { Shipping, freeShippingBanner } from "@contracts/constants";
@@ -31,7 +31,7 @@ function MarqueeSequence({ messages }: { messages: string[] }) {
 export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderProps) {
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
-  const [lastScroll, setLastScroll] = useState(0);
+  const lastScroll = useRef(0);
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
@@ -52,16 +52,18 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
   const secondaryMessages = texts.bannerMessages.split("\n").map((m) => m.trim()).filter(Boolean);
   const marqueeMessages = Array.from({ length: 4 }, () => [banner, ...secondaryMessages]).flat();
 
+  // Position precedente gardee dans une ref : l'en-tete ne se redessine que
+  // quand il change d'etat, pas a chaque pixel de defilement.
   useEffect(() => {
     const handleScroll = () => {
       const current = window.scrollY;
       setScrolled(current > 80);
-      setHidden(current > lastScroll && current > 300);
-      setLastScroll(current);
+      setHidden(current > lastScroll.current && current > 300);
+      lastScroll.current = current;
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [lastScroll]);
+  }, []);
 
   // Header transparent au-dessus de la photo sombre de l'accueil : logo et
   // icones passent en blanc pour rester lisibles.
@@ -96,7 +98,9 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
           {/* Center: Logo */}
           <Link to="/" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" aria-label="DN MODE">
             <img
-              src="/logo-dnmode.png"
+              src="/logo-dnmode-160.webp"
+              width={160}
+              height={160}
               alt="DN MODE"
               className={`h-14 sm:h-[52px] w-auto transition-[filter] duration-300 ${
                 overHero

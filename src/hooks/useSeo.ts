@@ -77,9 +77,10 @@ export function useSeo(build: ((site: Site) => SeoInput) | null): void {
       canonical.href = url;
     }
 
-    // Donnees structurees servies avec une autre page que celle affichee.
-    document.head.querySelectorAll<HTMLScriptElement>("script[data-seo-path]").forEach((script) => {
-      if (script.dataset.seoPath !== path) script.remove();
+    // Donnees structurees et prechargement servis avec une autre page que
+    // celle affichee.
+    document.head.querySelectorAll<HTMLElement>("[data-seo-path]").forEach((el) => {
+      if (el.dataset.seoPath !== path) el.remove();
     });
   }, [title, description, noindex, pathname]);
 }

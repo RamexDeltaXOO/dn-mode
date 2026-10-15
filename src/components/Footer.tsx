@@ -77,7 +77,7 @@ export default function Footer() {
           {/* Logo */}
           <div className="flex items-start justify-center lg:justify-center">
             <Link to="/" aria-label="DN MODE">
-              <img src="/logo-dnmode.png" alt="DN MODE" className="h-20 w-auto" />
+              <img src="/logo-dnmode-160.webp" width={160} height={160} alt="DN MODE" className="h-20 w-auto" />
             </Link>
           </div>
 

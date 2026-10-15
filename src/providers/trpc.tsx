@@ -7,7 +7,12 @@ import type { ReactNode } from "react";
 
 export const trpc = createTRPCReact<AppRouter>();
 
-const queryClient = new QueryClient();
+// Donnees reutilisees 30 s sans nouvel appel : passer d'une page a l'autre
+// ne recharge pas les memes produits. Les mutations (panier, CRM)
+// invalident explicitement ce qu'elles modifient.
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: 30_000 } },
+});
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
