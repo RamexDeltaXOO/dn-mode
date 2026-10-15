@@ -6,7 +6,7 @@ import { appRouter } from "./router";
 import { createContext } from "./context";
 import { env } from "./lib/env";
 import { createGoogleCallbackHandler } from "./lib/google-oauth";
-import { createUploadHandler } from "./lib/storage";
+import { createImageHandler, createUploadHandler } from "./lib/storage";
 import { ensureSchema } from "./lib/ensure-schema";
 import { createStripeWebhookHandler } from "./lib/stripe-webhook";
 import { Paths } from "@contracts/constants";
@@ -18,6 +18,8 @@ app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
 app.get(Paths.googleAuthCallback, createGoogleCallbackHandler());
 // Upload des images produits (multipart, hors tRPC)
 app.post(Paths.upload, createUploadHandler());
+// Images gardees en base quand aucun stockage S3 n'est configure
+app.get(`${Paths.images}/:id`, createImageHandler());
 // Notifications de paiement envoyees par Stripe (signature verifiee)
 app.post(Paths.stripeWebhook, createStripeWebhookHandler());
 app.use("/api/trpc/*", async (c) => {

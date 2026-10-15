@@ -12,6 +12,7 @@ export const Paths = {
   googleAuthCallback: "/api/auth/google/callback",
   authCallback: "/auth/callback",
   upload: "/api/upload",
+  images: "/api/images",
   stripeWebhook: "/api/stripe/webhook",
 } as const;
 

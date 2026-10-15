@@ -8,6 +8,7 @@ import {
   int,
   boolean,
   json,
+  customType,
 } from "drizzle-orm/mysql-core";
 
 // ── Users ───────────────────────────────────────────────────
@@ -307,3 +308,19 @@ export const reviews = mysqlTable("reviews", {
 });
 
 export type Review = typeof reviews.$inferSelect;
+
+// ── Images envoyees depuis le CRM ───────────────────────────
+// Stockage par defaut quand aucun service S3 n'est configure : le fichier
+// est garde en base et servi par GET /api/images/<id>.
+const mediumBlob = customType<{ data: Buffer }>({
+  // 16 Mo maximum, au-dessus de la limite d'upload.
+  dataType: () => "mediumblob",
+});
+
+export const images = mysqlTable("images", {
+  // Nom de fichier unique, extension comprise : "robe-noire-V1StGXR8_Z.webp".
+  id: varchar("id", { length: 100 }).primaryKey(),
+  contentType: varchar("content_type", { length: 100 }).notNull(),
+  data: mediumBlob("data").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

@@ -94,7 +94,21 @@ redirige vers `/auth/callback#token=...`, ou le front stocke le jeton.
 Le bouton n'apparait sur la page de connexion que si les deux cles sont
 renseignees.
 
-## Stockage des images produits (compatible S3)
+## Stockage des images produits
+
+**Rien a configurer.** Par defaut, les photos envoyees depuis le CRM sont
+enregistrees dans la base MySQL (table `images`, creee au demarrage du
+serveur) et servies par `GET /api/images/<fichier>`. Chaque fichier a un nom
+unique et une reponse cachee un an : le CDN d'App Hosting les garde en cache
+et la base n'est presque jamais relue. Suffisant pour quelques centaines de
+photos.
+
+Avant l'envoi, le navigateur reduit chaque photo a 2000 px de cote et la
+reencode en WebP (JPEG sur les navigateurs qui ne savent pas produire de
+WebP). Une photo de telephone de plusieurs Mo descend ainsi a quelques
+centaines de Ko, ce qui allege la base et accelere la boutique.
+
+### Option : service compatible S3 (gros catalogue)
 
 `Admin > Parametres > Stockage des images`
 
@@ -107,19 +121,22 @@ renseignees.
 | Secret Key | `storage_secret_key` | `STORAGE_SECRET_KEY` |
 | URL publique | `storage_public_url` | `STORAGE_PUBLIC_URL` |
 
-Une fois renseigne, **Admin > Produits** accepte le glisser-deposer et la
-selection de fichiers : JPEG, PNG, WebP ou AVIF, 8 Mo maximum par image. La
-premiere image de la liste sert de vignette sur la boutique ; les fleches
-sous chaque miniature permettent de reordonner.
+Des que l'endpoint, le bucket et les deux cles sont renseignes, les nouveaux
+envois partent vers ce service ; les images deja enregistrees en base restent
+servies. Fonctionne avec Google Cloud Storage (mode interoperabilite S3, cles
+HMAC), Cloudflare R2, Scaleway Object Storage ou MinIO. Le bucket doit etre
+lisible publiquement pour que les photos s'affichent sur la boutique.
 
-Fonctionne avec Google Cloud Storage (mode interoperabilite S3, cles HMAC),
-Cloudflare R2, Scaleway Object Storage ou MinIO. Le bucket doit etre lisible
-publiquement pour que les photos s'affichent sur la boutique.
+### Dans le CRM
+
+**Admin > Produits** accepte le glisser-deposer et la selection de fichiers :
+JPEG, PNG, WebP ou AVIF, 8 Mo maximum par image apres reduction. La premiere
+image de la liste sert de vignette sur la boutique ; les fleches sous chaque
+miniature permettent de reordonner. Une URL peut aussi etre collee a la main.
 
 Le fichier transite par le serveur (`POST /api/upload`, reserve aux
 administrateurs) plutot que par une URL pre-signee : cela evite d'avoir a
-configurer le CORS du bucket. Sans configuration, le formulaire produit reste
-utilisable en saisissant des URL a la main.
+configurer le CORS d'un bucket.
 
 ## Emails transactionnels (Resend)
 

@@ -179,7 +179,7 @@ Se connecter sur `https://<ton-url>/login` avec le compte admin, puis ouvrir
 defaut, France metropolitaine).
 
 **Page d'accueil** : image du bandeau principal et image « Look du moment ».
-Envoyer un fichier (le stockage des images doit etre configure) ou coller une
+Envoyer un fichier (rien a configurer, il est enregistre en base) ou coller une
 URL. Sans choix, les images livrees avec le site s'affichent.
 
 **Paiement Stripe** : cles depuis le tableau de bord Stripe. Commencer en mode

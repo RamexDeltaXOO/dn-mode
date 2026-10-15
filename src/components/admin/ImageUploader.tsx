@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
-import { Upload, X, Link2, GripVertical, AlertCircle } from "lucide-react";
+import { Upload, X, Link2, GripVertical } from "lucide-react";
 import { UPLOAD_ALLOWED_TYPES } from "@contracts/constants";
-import { trpc } from "@/providers/trpc";
 import { uploadImage, UPLOAD_MAX_MB } from "@/lib/upload";
 
 interface ImageUploaderProps {
@@ -22,9 +21,6 @@ export default function ImageUploader({ value, onChange }: ImageUploaderProps) {
   const [error, setError] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [manualUrl, setManualUrl] = useState("");
-
-  const { data: status } = trpc.upload.status.useQuery(undefined, { retry: false });
-  const storageReady = status?.configured ?? false;
 
   const uploadFiles = async (files: FileList | File[]) => {
     const list = Array.from(files);
@@ -124,18 +120,18 @@ export default function ImageUploader({ value, onChange }: ImageUploaderProps) {
         onDrop={(e) => {
           e.preventDefault();
           setDragOver(false);
-          if (storageReady && e.dataTransfer.files) uploadFiles(e.dataTransfer.files);
+          if (!uploading && e.dataTransfer.files) uploadFiles(e.dataTransfer.files);
         }}
         className={`border border-dashed px-4 py-6 text-center transition-colors ${
           dragOver ? "border-[#222222] bg-[#fafafa]" : "border-[#e0e0e0]"
-        } ${storageReady ? "" : "opacity-60"}`}
+        }`}
       >
         <input
           ref={inputRef}
           type="file"
           accept={ACCEPT}
           multiple
-          disabled={!storageReady || uploading}
+          disabled={uploading}
           onChange={(e) => e.target.files && uploadFiles(e.target.files)}
           className="hidden"
         />
@@ -150,8 +146,7 @@ export default function ImageUploader({ value, onChange }: ImageUploaderProps) {
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              disabled={!storageReady}
-              className="text-[0.75rem] uppercase tracking-[1.5px] border border-[#e0e0e0] px-4 py-2 hover:border-[#222222] disabled:cursor-not-allowed"
+              className="text-[0.75rem] uppercase tracking-[1.5px] border border-[#e0e0e0] px-4 py-2 hover:border-[#222222]"
             >
               Choisir des images
             </button>
@@ -161,17 +156,6 @@ export default function ImageUploader({ value, onChange }: ImageUploaderProps) {
           </>
         )}
       </div>
-
-      {!storageReady && (
-        <p className="flex items-start gap-2 text-[0.6875rem] text-[#666666] bg-[#f4f4f4] p-3">
-          <AlertCircle size={13} className="text-[#999999] flex-shrink-0 mt-0.5" />
-          <span>
-            Stockage non configure. Renseignez vos identifiants dans{" "}
-            <strong>Parametres &gt; Stockage des images</strong>, ou ajoutez une URL a la main
-            ci-dessous.
-          </span>
-        </p>
-      )}
 
       {error && (
         <p className="text-[0.6875rem] text-red-600">{error}</p>

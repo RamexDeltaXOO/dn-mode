@@ -3,20 +3,29 @@ import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import {
   ConfigKeys,
+  Paths,
   UPLOAD_ALLOWED_TYPES,
   UPLOAD_MAX_BYTES,
 } from "@contracts/constants";
-import { users } from "@db/schema";
+import { images, users } from "@db/schema";
 import { getConfigValue } from "./site-config";
 import { getDb } from "../queries/connection";
 import { verifyLocalToken } from "../local-auth-router";
 
 /**
- * Stockage des images produits sur un service compatible S3.
+ * Stockage des images produits.
  *
- * Fonctionne avec Google Cloud Storage (mode interoperabilite S3),
- * Cloudflare R2, Scaleway Object Storage, MinIO... Les identifiants se
- * saisissent dans le CRM (Admin > Parametres > Stockage des images).
+ * Par defaut, sans rien configurer, les images sont gardees dans la base
+ * MySQL (table `images`) et servies par GET /api/images/<id>. Leur URL ne
+ * change jamais, le CDN d'App Hosting les met donc en cache durablement et
+ * la base n'est presque jamais relue. Largement suffisant pour quelques
+ * centaines de photos.
+ *
+ * Pour un gros catalogue, un service compatible S3 (Google Cloud Storage en
+ * mode interoperabilite, Cloudflare R2, Scaleway Object Storage, MinIO...)
+ * prend le relais des que ses identifiants sont saisis dans le CRM
+ * (Admin > Parametres > Stockage des images). Les images deja envoyees en
+ * base restent servies.
  *
  * Le fichier transite par le serveur plutot que par une URL pre-signee :
  * cela evite d'avoir a configurer le CORS du bucket, au prix d'un passage
@@ -70,8 +79,8 @@ const EXTENSIONS: Record<string, string> = {
   "image/avif": "avif",
 };
 
-/** Nom d'objet non devinable, sans caractere problematique. */
-function buildObjectKey(fileName: string, contentType: string): string {
+/** Nom de fichier non devinable, sans caractere problematique. */
+function buildFileName(fileName: string, contentType: string): string {
   const ext = EXTENSIONS[contentType] ?? "bin";
   const base = fileName
     .replace(/\.[^.]+$/, "")
@@ -81,8 +90,11 @@ function buildObjectKey(fileName: string, contentType: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 48) || "image";
-  return `produits/${base}-${nanoid(10)}.${ext}`;
+  return `${base}-${nanoid(10)}.${ext}`;
 }
+
+/** Forme des noms produits par buildFileName : rien d'autre n'est relu en base. */
+const STORED_FILE_NAME = /^[a-z0-9-]+-[A-Za-z0-9_-]{10}\.[a-z]+$/;
 
 export type UploadResult =
   | { ok: true; url: string; key: string }
@@ -93,16 +105,6 @@ export async function uploadImage(input: {
   fileName: string;
   contentType: string;
 }): Promise<UploadResult> {
-  const config = await getStorageConfig();
-  if (!config.configured) {
-    return {
-      ok: false,
-      status: 503,
-      error:
-        "Stockage non configure. Renseignez vos identifiants dans Parametres > Stockage des images.",
-    };
-  }
-
   if (!(UPLOAD_ALLOWED_TYPES as readonly string[]).includes(input.contentType)) {
     return {
       ok: false,
@@ -119,6 +121,35 @@ export async function uploadImage(input: {
     };
   }
 
+  const config = await getStorageConfig();
+  const fileName = buildFileName(input.fileName, input.contentType);
+  return config.configured
+    ? uploadToS3(config, fileName, input)
+    : uploadToDatabase(fileName, input);
+}
+
+async function uploadToDatabase(
+  fileName: string,
+  input: { bytes: Uint8Array; contentType: string },
+): Promise<UploadResult> {
+  try {
+    await getDb().insert(images).values({
+      id: fileName,
+      contentType: input.contentType,
+      data: Buffer.from(input.bytes),
+    });
+    return { ok: true, url: `${Paths.images}/${fileName}`, key: fileName };
+  } catch (error) {
+    console.error("[storage] database upload failed", error);
+    return { ok: false, status: 500, error: "Echec de l'enregistrement de l'image" };
+  }
+}
+
+async function uploadToS3(
+  config: StorageConfig,
+  fileName: string,
+  input: { bytes: Uint8Array; contentType: string },
+): Promise<UploadResult> {
   try {
     const { S3Client, PutObjectCommand } = await import("@aws-sdk/client-s3");
     const client = new S3Client({
@@ -133,7 +164,7 @@ export async function uploadImage(input: {
       },
     });
 
-    const key = buildObjectKey(input.fileName, input.contentType);
+    const key = `produits/${fileName}`;
     await client.send(
       new PutObjectCommand({
         Bucket: config.bucket,
@@ -153,6 +184,41 @@ export async function uploadImage(input: {
       error: error instanceof Error ? error.message : "Echec de l'envoi vers le stockage",
     };
   }
+}
+
+/**
+ * Route Hono GET /api/images/:id : sert une image gardee en base. Le nom
+ * etant unique et jamais reutilise, la reponse est cachee un an.
+ */
+export function createImageHandler() {
+  return async (c: Context) => {
+    const id = c.req.param("id") ?? "";
+    if (!STORED_FILE_NAME.test(id)) {
+      return c.json({ error: "Not Found" }, 404);
+    }
+
+    let row: { contentType: string; data: Buffer } | undefined;
+    try {
+      [row] = await getDb()
+        .select({ contentType: images.contentType, data: images.data })
+        .from(images)
+        .where(eq(images.id, id))
+        .limit(1);
+    } catch (error) {
+      console.error("[storage] database read failed", error);
+      return c.json({ error: "Image indisponible" }, 503);
+    }
+
+    if (!row) {
+      return c.json({ error: "Not Found" }, 404);
+    }
+
+    return c.body(new Uint8Array(row.data), 200, {
+      "Content-Type": row.contentType,
+      "Cache-Control": "public, max-age=31536000, immutable",
+      "X-Content-Type-Options": "nosniff",
+    });
+  };
 }
 
 /** Verifie le jeton de session et exige le role administrateur. */

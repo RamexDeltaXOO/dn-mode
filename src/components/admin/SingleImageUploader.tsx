@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Upload, RotateCcw, AlertCircle } from "lucide-react";
+import { Upload, RotateCcw } from "lucide-react";
 import { UPLOAD_ALLOWED_TYPES } from "@contracts/constants";
 import { uploadImage, UPLOAD_MAX_MB } from "@/lib/upload";
 
@@ -10,7 +10,6 @@ interface SingleImageUploaderProps {
   value: string;
   /** Image livree avec le site, affichee quand `value` est vide. */
   defaultUrl: string;
-  storageReady: boolean;
   /** Format de l'apercu, aligne sur celui de la boutique. */
   aspect: string;
   /** Saisie de l'URL a la main (enregistree avec le reste du formulaire). */
@@ -30,7 +29,6 @@ export default function SingleImageUploader({
   hint,
   value,
   defaultUrl,
-  storageReady,
   aspect,
   onChange,
   onCommit,
@@ -67,12 +65,12 @@ export default function SingleImageUploader({
       </div>
 
       <div
-        onDragOver={(e) => { e.preventDefault(); if (storageReady) setDragOver(true); }}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={(e) => {
           e.preventDefault();
           setDragOver(false);
-          if (storageReady && !uploading) upload(e.dataTransfer.files?.[0]);
+          if (!uploading) upload(e.dataTransfer.files?.[0]);
         }}
         className={`relative ${aspect} overflow-hidden bg-[#121212] border ${
           dragOver ? "border-[#222222]" : "border-[#e0e0e0]"
@@ -91,7 +89,7 @@ export default function SingleImageUploader({
         ref={inputRef}
         type="file"
         accept={ACCEPT}
-        disabled={!storageReady || uploading}
+        disabled={uploading}
         onChange={(e) => upload(e.target.files?.[0])}
         className="hidden"
       />
@@ -100,7 +98,7 @@ export default function SingleImageUploader({
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          disabled={!storageReady || uploading}
+          disabled={uploading}
           className="flex items-center gap-1.5 text-[0.625rem] uppercase tracking-[1px] bg-[#222222] text-white px-3 py-1.5 hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Upload size={11} />
@@ -130,16 +128,6 @@ export default function SingleImageUploader({
       />
 
       {hint && <p className="text-[0.6875rem] text-[#999999]">{hint}</p>}
-
-      {!storageReady && (
-        <p className="flex items-start gap-2 text-[0.6875rem] text-[#666666] bg-[#f4f4f4] p-3">
-          <AlertCircle size={13} className="text-[#999999] flex-shrink-0 mt-0.5" />
-          <span>
-            Stockage non configure : renseignez vos identifiants dans{" "}
-            <strong>Stockage des images</strong> ci-dessous, ou collez une URL dans le champ.
-          </span>
-        </p>
-      )}
 
       {error && <p className="text-[0.6875rem] text-red-600">{error}</p>}
     </div>

@@ -276,7 +276,6 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
                 hint="Affichee en fond, assombrie, derriere le message d'accueil. Format paysage conseille."
                 value={form.home_hero_image}
                 defaultUrl={HomeImageDefaults.hero}
-                storageReady={Boolean(storageStatus?.configured)}
                 aspect="aspect-[16/9]"
                 onChange={(v) => setForm({ ...form, home_hero_image: v })}
                 onCommit={(v) => {
@@ -289,7 +288,6 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
                 hint="Affichee au format 16/9 sous les produits, avec le bouton vers la collection."
                 value={form.home_look_image}
                 defaultUrl={HomeImageDefaults.look}
-                storageReady={Boolean(storageStatus?.configured)}
                 aspect="aspect-[16/9]"
                 onChange={(v) => setForm({ ...form, home_look_image: v })}
                 onCommit={(v) => {
@@ -460,8 +458,8 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
               icon={Image}
               title="Stockage des images"
               badge={{
-                label: storageStatus?.configured ? "Actif" : "Non configure",
-                ok: Boolean(storageStatus?.configured),
+                label: storageStatus?.provider === "s3" ? "S3" : "Base de donnees",
+                ok: true,
               }}
             />
             <div className="space-y-4">
@@ -474,10 +472,11 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
               <Field label="Secret Key" value={form.storage_secret_key} onChange={(v) => setForm({ ...form, storage_secret_key: v })} type="password" placeholder="..." />
               <Field label="URL publique (optionnel)" value={form.storage_public_url} onChange={(v) => setForm({ ...form, storage_public_url: v })} placeholder="https://images.dnmode.fr" />
               <p className="text-[0.6875rem] text-[#999999]">
-                Compatible Google Cloud Storage (mode interoperabilite S3), Cloudflare R2, Scaleway
-                Object Storage. Le bucket doit etre accessible en lecture publique pour que les
-                photos s&apos;affichent sur la boutique. Sans configuration, les images s&apos;ajoutent
-                uniquement par URL.
+                Rien a configurer : tant que ces champs sont vides, les photos envoyees depuis le
+                CRM sont enregistrees dans la base de donnees de la boutique, ce qui suffit pour
+                quelques centaines d&apos;images. Ces champs ne servent que pour un gros catalogue,
+                avec un service compatible S3 (Google Cloud Storage, Cloudflare R2, Scaleway) dont
+                le bucket est lisible publiquement.
               </p>
             </div>
           </div>

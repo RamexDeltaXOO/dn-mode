@@ -34,6 +34,16 @@ const ADDITIVE_TABLES: Array<{ table: string; ddl: string }> = [
       PRIMARY KEY (\`id\`)
     )`,
   },
+  {
+    table: "images",
+    ddl: `CREATE TABLE IF NOT EXISTS \`images\` (
+      \`id\` varchar(100) NOT NULL,
+      \`content_type\` varchar(100) NOT NULL,
+      \`data\` mediumblob NOT NULL,
+      \`created_at\` timestamp NOT NULL DEFAULT (now()),
+      PRIMARY KEY (\`id\`)
+    )`,
+  },
 ];
 
 function firstRow(result: unknown): Record<string, unknown> | undefined {
