@@ -3,6 +3,8 @@ import { Link, useSearchParams } from "react-router";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { carrierLabel } from "@contracts/constants";
+import { pageTitle } from "@contracts/seo";
+import { useSeo } from "@/hooks/useSeo";
 import { trpc } from "@/providers/trpc";
 import { ChevronLeft, Check, ShoppingBag } from "lucide-react";
 import ShippingMethodSelector from "@/components/ShippingMethodSelector";
@@ -203,6 +205,7 @@ function CheckoutForm({ clientSecret, orderId, orderNumber, total, carrierName, 
 
 export default function CheckoutPage() {
   const [params] = useSearchParams();
+  useSeo((site) => ({ title: pageTitle("Commande", site.siteName), noindex: true }));
   const paymentIntentId = params.get("payment_intent");
 
   if (paymentIntentId) {

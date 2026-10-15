@@ -17,6 +17,8 @@ import {
   Star,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useSeo } from "@/hooks/useSeo";
+import { pageTitle } from "@contracts/seo";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
@@ -36,6 +38,7 @@ export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isLoading, logout } = useAuth();
+  useSeo((site) => ({ title: pageTitle("Administration", site.siteName), noindex: true }));
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "admin")) {

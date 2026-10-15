@@ -98,6 +98,7 @@ function SectionHeader({
 
 const EMPTY_FORM = {
   site_name: "DN MODE",
+  site_url: "",
   site_description: "",
   contact_email: "",
   shipping_threshold: String(Shipping.freeThreshold),
@@ -253,7 +254,13 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
             <SectionHeader icon={Globe} title="Site Web" />
             <div className="space-y-4">
               <Field label="Nom du site" value={form.site_name} onChange={(v) => setForm({ ...form, site_name: v })} placeholder="DN MODE" />
-              <Field label="Description" value={form.site_description} onChange={(v) => setForm({ ...form, site_description: v })} placeholder="Description pour SEO..." />
+              <Field label="URL du site" value={form.site_url} onChange={(v) => setForm({ ...form, site_url: v.trim() })} placeholder="https://dnmode.fr" />
+              <Field label="Description (Google)" value={form.site_description} onChange={(v) => setForm({ ...form, site_description: v })} placeholder="Texte affiche sous le nom du site dans Google, 160 caracteres max" />
+              <p className="text-[0.6875rem] text-[#999999]">
+                L&apos;URL du site sert d&apos;adresse officielle pour Google et le sitemap
+                ({form.site_url || "https://dnmode.fr"}/sitemap.xml, a declarer dans Google Search
+                Console). Laissez-la vide pour utiliser celle definie au deploiement.
+              </p>
               <Field label="Email de contact" value={form.contact_email} onChange={(v) => setForm({ ...form, contact_email: v })} placeholder="contact@dnmode.fr" />
               <Field label="URL Instagram" value={form.instagram_url} onChange={(v) => setForm({ ...form, instagram_url: v })} placeholder="https://instagram.com/..." />
               <div className="grid grid-cols-3 gap-4">

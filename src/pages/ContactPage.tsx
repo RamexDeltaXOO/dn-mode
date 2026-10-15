@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { Check } from "lucide-react";
+import { contactSeo } from "@contracts/seo";
+import { useSeo } from "@/hooks/useSeo";
 
 export default function ContactPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  useSeo((site) => contactSeo(site.siteName));
 
   const createContact = trpc.contact.create.useMutation({
     onSuccess: () => {
@@ -28,7 +31,7 @@ export default function ContactPage() {
     <div className="pt-[92px] min-h-[100dvh]">
       <div className="max-w-[700px] mx-auto px-4 sm:px-6 py-12 sm:py-16">
         <h1 className="text-2xl sm:text-3xl font-light text-[#222222] text-center mb-4">
-          Get in touch
+          Nous contacter
         </h1>
         <p className="text-[0.9375rem] text-[#666666] text-center mb-12 max-w-[500px] mx-auto leading-[1.6]">
           Nous sommes la pour vous aider. Envoyez-nous un message et nous vous repondrons dans les plus brefs delais.

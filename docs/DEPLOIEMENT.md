@@ -175,8 +175,9 @@ Supprimer le `.env` ensuite : `rm .env`.
 Se connecter sur `https://<ton-url>/login` avec le compte admin, puis ouvrir
 **Admin > Parametres**. Tout se saisit ici, rien a redeployer.
 
-**Site web** : nom, email de contact, seuil de livraison offerte (100€ par
-defaut, France metropolitaine).
+**Site web** : nom, URL du site (`https://dnmode.fr`), description affichee
+dans Google, email de contact, seuil de livraison offerte (100€ par defaut,
+France metropolitaine).
 
 **Page d'accueil** : image du bandeau principal et image « Look du moment ».
 Envoyer un fichier (rien a configurer, il est enregistre en base) ou coller une
@@ -226,8 +227,14 @@ registrar. Le certificat TLS est emis automatiquement (compter jusqu'a 24 h).
 Ensuite, deux choses a reprendre :
 
 - l'URI de redirection Google (etape 7) avec le domaine definitif ;
-- la variable `PUBLIC_APP_URL` dans `apphosting.yaml`, utilisee dans les liens
-  des emails.
+- la variable `PUBLIC_APP_URL` dans `apphosting.yaml` (ou le champ « URL du
+  site » du CRM), utilisee dans les liens des emails et comme adresse
+  officielle pour Google.
+
+Puis declarer le site a Google : [Google Search Console](https://search.google.com/search-console),
+ajouter la propriete `dnmode.fr` (verification par enregistrement DNS), puis
+**Sitemaps** > envoyer `https://dnmode.fr/sitemap.xml`. Le detail est dans
+`docs/INTEGRATIONS.md`, section Referencement.
 
 ---
 
@@ -244,6 +251,9 @@ Ensuite, deux choses a reprendre :
 - [ ] Le formulaire de contact declenche l'accuse de reception, et une reponse
       depuis Admin > Messages arrive bien
 - [ ] Connexion Gmail fonctionnelle (si configuree)
+- [ ] `https://dnmode.fr/sitemap.xml` liste les produits, et le
+      [test des resultats enrichis](https://search.google.com/test/rich-results)
+      reconnait la fiche produit (prix, disponibilite) sur une page article
 
 ---
 

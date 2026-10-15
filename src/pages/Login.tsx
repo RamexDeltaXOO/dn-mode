@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { LogIn, UserPlus } from "lucide-react";
+import { pageTitle } from "@contracts/seo";
+import { useSeo } from "@/hooks/useSeo";
 
 const GOOGLE_ERRORS: Record<string, string> = {
   google_denied: "Connexion Google annulee.",
@@ -44,6 +46,7 @@ export default function Login() {
   const [name, setName] = useState("");
   const [error, setError] = useState(searchParams.get("error") ? GOOGLE_ERRORS[searchParams.get("error") as string] || "La connexion a echoue." : "");
   const [googlePending, setGooglePending] = useState(false);
+  useSeo((site) => ({ title: pageTitle("Connexion", site.siteName), noindex: true }));
 
   const utils = trpc.useUtils();
   const { data: googleConfig } = trpc.googleAuth.getConfig.useQuery(undefined, {

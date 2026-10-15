@@ -3,6 +3,8 @@ import { useParams, Link } from "react-router";
 import { Shipping, stockFor } from "@contracts/constants";
 import { trpc } from "@/providers/trpc";
 import { ChevronLeft, ShoppingBag, Check } from "lucide-react";
+import { pageTitle, productSeo } from "@contracts/seo";
+import { useSeo } from "@/hooks/useSeo";
 
 export default function ProductPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -46,6 +48,15 @@ export default function ProductPage() {
       setTimeout(() => setAdded(false), 2000);
     },
   });
+
+  useSeo(
+    isLoading
+      ? null
+      : (site) =>
+          product && product.isActive !== false
+            ? productSeo(product, site.siteName)
+            : { title: pageTitle("Produit introuvable", site.siteName), noindex: true },
+  );
 
   if (isLoading) {
     return (
@@ -125,13 +136,18 @@ export default function ProductPage() {
                       mainImage === img ? "border-[#222222]" : "border-transparent"
                     }`}
                   >
-                    <img src={img} alt="" className="w-full h-full object-cover" />
+                    <img src={img} alt={`${product.name}, photo ${i + 1}`} className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
             )}
             <div className="flex-1 aspect-[3/4] bg-[#eaeaea] overflow-hidden">
-              <img src={mainImage || "/placeholder.png"} alt={product.name} className="w-full h-full object-cover" />
+              <img
+                src={mainImage || "/placeholder.png"}
+                alt={product.name}
+                fetchPriority="high"
+                className="w-full h-full object-cover"
+              />
             </div>
           </div>
 
@@ -236,7 +252,7 @@ export default function ProductPage() {
 
             {product.description && (
               <div className="mt-8 pt-6 border-t border-[#e0e0e0]">
-                <h3 className="section-label mb-3">Description</h3>
+                <h2 className="section-label mb-3">Description</h2>
                 <p className="text-[0.8125rem] text-[#666666] leading-[1.6] whitespace-pre-line">
                   {product.description}
                 </p>

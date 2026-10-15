@@ -3,6 +3,8 @@ import { Link } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { HomeImageDefaults, collectionHref } from "@contracts/constants";
 import { useSiteContent } from "@/hooks/useSiteContent";
+import { useSeo } from "@/hooks/useSeo";
+import { homeSeo } from "@contracts/seo";
 import RichText from "@/components/RichText";
 import gsap from "gsap";
 import ReviewsCarousel from "@/components/ReviewsCarousel";
@@ -26,7 +28,8 @@ export default function Home() {
   const lookImage = homeImages?.look ?? (homeImagesError ? HomeImageDefaults.look : undefined);
 
   // Textes et liens choisis dans le CRM (Parametres > Textes du site).
-  const { texts } = useSiteContent();
+  const { texts, siteName } = useSiteContent();
+  useSeo(homeSeo);
 
   // Track page view
   const trackView = trpc.analytics.trackPageView.useMutation();
@@ -81,11 +84,14 @@ export default function Home() {
         {heroImage && (
           <img
             src={heroImage}
-            alt="DN MODE"
+            alt={siteName}
+            fetchPriority="high"
             className="absolute inset-0 w-full h-full object-cover opacity-40"
           />
         )}
         <div className="relative z-10 text-center px-6">
+          {/* Titre principal pour les moteurs de recherche, le logo tenant ce role a l'ecran */}
+          <h1 className="sr-only">{siteName} : boutique de mode féminine en ligne</h1>
           <Link
             to={collectionHref(texts.heroCollection)}
             className="hero-headline opacity-0 translate-y-4 inline-block bg-white text-[#121212] text-[0.75rem] sm:text-[0.8125rem] uppercase tracking-[3px] font-medium px-8 py-4 hover:bg-[#121212] hover:text-white border border-white transition-colors duration-300"
@@ -138,6 +144,8 @@ export default function Home() {
                   <img
                     src={product.images?.[0] || "/placeholder.png"}
                     alt={product.name}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
                   />
                   {(!product.inventoryQuantity || product.inventoryQuantity <= 0) && (
@@ -174,7 +182,9 @@ export default function Home() {
             {lookImage && (
               <img
                 src={lookImage}
-                alt="Look du Moment"
+                alt={texts.lookButton}
+                loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover"
               />
             )}

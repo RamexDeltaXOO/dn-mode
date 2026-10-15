@@ -2,6 +2,8 @@ import { useParams, Link } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { useEffect, useMemo, useRef } from "react";
 import gsap from "gsap";
+import { collectionSeo, pageTitle } from "@contracts/seo";
+import { useSeo } from "@/hooks/useSeo";
 
 export default function CollectionPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -36,6 +38,15 @@ export default function CollectionPage() {
   }, [products, slug]);
 
   const title = currentCollection?.name || (isAll ? "Tous les articles" : notFound ? "Collection introuvable" : "");
+
+  useSeo(
+    collectionsLoading
+      ? null
+      : (site) =>
+          notFound
+            ? { title: pageTitle("Collection introuvable", site.siteName), noindex: true }
+            : collectionSeo(currentCollection ?? null, site.siteName),
+  );
 
   return (
     <div className="pt-[92px] min-h-[100dvh]">
@@ -76,7 +87,7 @@ export default function CollectionPage() {
             )}
 
             <div ref={gridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {products.map((product) => (
+              {products.map((product, index) => (
                 <Link
                   key={product.id}
                   to={`/products/${product.slug}`}
@@ -86,6 +97,9 @@ export default function CollectionPage() {
                     <img
                       src={product.images?.[0] || "/placeholder.png"}
                       alt={product.name}
+                      // La premiere rangee est visible des l'arrivee sur la page.
+                      loading={index < 3 ? "eager" : "lazy"}
+                      decoding="async"
                       className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
                     />
                     {(!product.inventoryQuantity || product.inventoryQuantity <= 0) && (

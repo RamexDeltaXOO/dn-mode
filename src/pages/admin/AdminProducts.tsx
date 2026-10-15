@@ -133,7 +133,8 @@ export default function AdminProducts() {
       slug: form.slug || slugify(form.name),
       price: form.price,
       description: form.description || undefined,
-      shortDescription: form.shortDescription || undefined,
+      // Chaine vide envoyee telle quelle pour pouvoir effacer le texte.
+      shortDescription: form.shortDescription.trim(),
       images: form.images.filter((url) => url.trim() !== ""),
       colors: formColors,
       sizes: formSizes,
@@ -256,6 +257,22 @@ export default function AdminProducts() {
                   Poids d&apos;une piece, emballage exclu. Sert a choisir la tranche tarifaire du
                   transporteur et a declarer le poids exact du colis a Sendcloud. Laisse vide pour
                   utiliser le poids par defaut des Parametres.
+                </p>
+              </div>
+              <div>
+                <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">
+                  Description courte (Google)
+                </label>
+                <input
+                  value={form.shortDescription}
+                  onChange={(e) => setForm({ ...form, shortDescription: e.target.value })}
+                  maxLength={300}
+                  placeholder="Robe longue fluide en crêpe, manches bouffantes, idéale pour les grandes occasions."
+                  className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222]"
+                />
+                <p className={`text-[0.6875rem] mt-1 ${form.shortDescription.length > 160 ? "text-[#b45309]" : "text-[#999999]"}`}>
+                  {form.shortDescription.length}/160 : texte affiche sous le nom du produit dans Google et dans
+                  les apercus de liens. Vide : debut de la description.
                 </p>
               </div>
               <div>

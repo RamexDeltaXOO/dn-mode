@@ -171,3 +171,44 @@ Seuil et frais par defaut : **Admin > Parametres > Site Web**
 La valeur alimente le bandeau du site (defilant sur mobile), le panier, la fiche
 produit, le tunnel de commande et le calcul serveur des frais de port
 (`api/lib/shipping.ts`). Changer le seuil dans le CRM le met a jour partout.
+
+## Referencement (SEO)
+
+Rien a configurer pour que ca marche. Le serveur complete le HTML de chaque
+page (`api/lib/seo.ts`) avant de l'envoyer, pour que Google, Bing et les
+apercus de liens (WhatsApp, Instagram, Facebook) voient le vrai contenu
+d'une boutique dont l'affichage se fait en JavaScript :
+
+- **Titre et description** par page. Produit : description courte, sinon
+  description, sinon une phrase avec le prix. Collection : description de la
+  collection, sinon une phrase generique. Accueil : `Admin > Parametres >
+  Site Web > Description (Google)`.
+- **URL canonique** sur le domaine officiel : champ « URL du site » du CRM,
+  sinon `PUBLIC_APP_URL`, sinon le domaine de la requete.
+- **Apercus de liens** (Open Graph) : premiere photo du produit, image de la
+  collection ou visuel d'accueil.
+- **Donnees structurees** schema.org : fiche produit avec prix, devise,
+  disponibilite et photos (resultats enrichis Google), fil d'Ariane,
+  organisation avec logo et compte Instagram.
+- **Codes HTTP justes** : une adresse inconnue, un produit supprime ou
+  desactive dans le CRM repondent 404, pour sortir proprement de Google.
+- **Pages privees** (`/admin`, `/checkout`, `/login`) marquees `noindex`.
+- **Contenu de secours** dans `<noscript>` (titre, texte, liens) pour les
+  robots qui n'executent pas le JavaScript.
+
+`/sitemap.xml` liste l'accueil, les collections, les produits actifs (avec
+date de modification et photos) et la page contact. `/robots.txt` y renvoie
+et ferme `/admin`, `/checkout` et `/auth/`. `/api/` doit rester ouvert :
+Google l'appelle pour afficher les produits, et les photos y sont servies.
+
+Dans le navigateur, `src/hooks/useSeo.ts` garde titre, description et
+canonique a jour quand on change de page sans recharger.
+
+### A faire une fois en ligne
+
+1. [Google Search Console](https://search.google.com/search-console) :
+   ajouter `dnmode.fr`, verifier par DNS, puis **Sitemaps** > envoyer
+   `https://dnmode.fr/sitemap.xml`.
+2. Bing Webmaster Tools : importer le site depuis Search Console.
+3. Pour chaque produit, remplir la **description courte** (une phrase, 160
+   caracteres max) : c'est le texte affiche sous le titre dans Google.

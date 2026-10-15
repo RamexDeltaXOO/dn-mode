@@ -58,7 +58,7 @@ export default function Footer() {
               </form>
             )}
             <div className="flex gap-3 mt-4">
-              <a href={instagramUrl} target="_blank" rel="noopener noreferrer" className="hover:opacity-60">
+              <a href={instagramUrl} target="_blank" rel="noopener noreferrer" className="hover:opacity-60" aria-label="Instagram">
                 <Instagram size={20} strokeWidth={1.5} />
               </a>
             </div>
@@ -68,8 +68,8 @@ export default function Footer() {
           <div>
             <h3 className="section-label mb-4">Mon Compte</h3>
             <ul className="space-y-2">
-              <li><Link to="/account" className="text-[0.8125rem] text-[#666666] hover:text-[#222222] transition-colors">Mes commandes</Link></li>
-              <li><Link to="/account" className="text-[0.8125rem] text-[#666666] hover:text-[#222222] transition-colors">Mon compte</Link></li>
+              <li><Link to="/login" className="text-[0.8125rem] text-[#666666] hover:text-[#222222] transition-colors">Mes commandes</Link></li>
+              <li><Link to="/login" className="text-[0.8125rem] text-[#666666] hover:text-[#222222] transition-colors">Mon compte</Link></li>
               <li><Link to="/contact" className="text-[0.8125rem] text-[#666666] hover:text-[#222222] transition-colors">Contact</Link></li>
             </ul>
           </div>

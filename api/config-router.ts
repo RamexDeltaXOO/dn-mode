@@ -4,6 +4,7 @@ import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { siteConfig } from "@db/schema";
 import { ConfigKeys, HomeImageDefaults, HomeTextDefaults, type HomeTexts } from "@contracts/constants";
+import { SeoDefaults } from "@contracts/seo";
 import { getConfigValues } from "./lib/site-config";
 
 export const configRouter = createRouter({
@@ -27,8 +28,9 @@ export const configRouter = createRouter({
   }),
 
   /**
-   * Textes du site modifiables depuis le CRM (accueil, bandeau) et lien
-   * Instagram. Liste blanche : rien d'autre de la configuration ne sort.
+   * Textes du site modifiables depuis le CRM (accueil, bandeau), nom et
+   * description du site, lien Instagram. Liste blanche : rien d'autre de la
+   * configuration ne sort.
    */
   siteContent: publicQuery.query(async () => {
     const textKeys: Record<keyof HomeTexts, string> = {
@@ -42,7 +44,12 @@ export const configRouter = createRouter({
       reviewsTitle: ConfigKeys.homeReviewsTitle,
       bannerMessages: ConfigKeys.bannerMessages,
     };
-    const values = await getConfigValues([...Object.values(textKeys), ConfigKeys.instagramUrl]);
+    const values = await getConfigValues([
+      ...Object.values(textKeys),
+      ConfigKeys.instagramUrl,
+      ConfigKeys.siteName,
+      ConfigKeys.siteDescription,
+    ]);
     const texts = Object.fromEntries(
       (Object.keys(textKeys) as Array<keyof HomeTexts>).map((k) => [
         k,
@@ -52,6 +59,8 @@ export const configRouter = createRouter({
     return {
       texts,
       instagramUrl: values[ConfigKeys.instagramUrl]?.trim() || "https://www.instagram.com",
+      siteName: values[ConfigKeys.siteName]?.trim() || SeoDefaults.siteName,
+      siteDescription: values[ConfigKeys.siteDescription]?.trim() || SeoDefaults.description,
     };
   }),
 

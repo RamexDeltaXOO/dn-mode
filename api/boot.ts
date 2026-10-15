@@ -9,6 +9,7 @@ import { createGoogleCallbackHandler } from "./lib/google-oauth";
 import { createImageHandler, createUploadHandler } from "./lib/storage";
 import { ensureSchema } from "./lib/ensure-schema";
 import { createStripeWebhookHandler } from "./lib/stripe-webhook";
+import { createRobotsHandler, createSitemapHandler } from "./lib/seo";
 import { Paths } from "@contracts/constants";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
@@ -20,6 +21,9 @@ app.get(Paths.googleAuthCallback, createGoogleCallbackHandler());
 app.post(Paths.upload, createUploadHandler());
 // Images gardees en base quand aucun stockage S3 n'est configure
 app.get(`${Paths.images}/:id`, createImageHandler());
+// Referencement : generes depuis la base a chaque demande
+app.get("/robots.txt", createRobotsHandler());
+app.get("/sitemap.xml", createSitemapHandler());
 // Notifications de paiement envoyees par Stripe (signature verifiee)
 app.post(Paths.stripeWebhook, createStripeWebhookHandler());
 app.use("/api/trpc/*", async (c) => {

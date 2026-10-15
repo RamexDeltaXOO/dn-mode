@@ -126,14 +126,14 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
                 </button>
               </div>
             ) : (
-              <Link to="/login" className="p-1 hover:opacity-60 transition-opacity">
+              <Link to="/login" className="p-1 hover:opacity-60 transition-opacity" aria-label="Mon compte">
                 <User size={20} strokeWidth={1.5} />
               </Link>
             )}
-            <button onClick={onSearchOpen} className="p-1 hover:opacity-60 transition-opacity" aria-label="Search">
+            <button onClick={onSearchOpen} className="p-1 hover:opacity-60 transition-opacity" aria-label="Rechercher">
               <Search size={20} strokeWidth={1.5} />
             </button>
-            <button onClick={onCartOpen} className="p-1 hover:opacity-60 transition-opacity relative" aria-label="Cart">
+            <button onClick={onCartOpen} className="p-1 hover:opacity-60 transition-opacity relative" aria-label="Panier">
               <ShoppingBag size={20} strokeWidth={1.5} />
               {cartCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#222222] text-white text-[0.5rem] flex items-center justify-center">
