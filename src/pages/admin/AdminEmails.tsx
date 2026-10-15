@@ -171,7 +171,7 @@ export default function AdminEmails() {
                   <div className="p-3 bg-[#f4f4f4] border-b border-[#e0e0e0]">
                     <p className="text-[0.75rem] text-[#666666]"><strong>Sujet :</strong> {previewTemplate.data.subject}</p>
                   </div>
-                  <iframe srcDoc={previewTemplate.data.html} className="w-full h-[500px] border-0" title="Email preview" />
+                  <iframe sandbox="" srcDoc={previewTemplate.data.html} className="w-full h-[500px] border-0" title="Email preview" />
                 </>
               ) : (
                 <div className="p-8 text-center text-[0.8125rem] text-[#999999]">Chargement...</div>

@@ -10,6 +10,9 @@ import { contentWeightGrams, getWeightSettings } from "./lib/weight";
 import { buildOrderEmailVariables } from "./order-router";
 import { sendTemplateEmail } from "./lib/mailer";
 import { decrementStockForOrder } from "./lib/stock";
+import { orderItemsInput, shortText } from "./lib/order-input";
+import { isValidOrderConfirmToken, orderConfirmToken } from "./lib/order-token";
+import { clientIp, hitRateLimit } from "./lib/rate-limit";
 
 // Get Stripe key from DB config or env
 async function getStripeKey(): Promise<string> {
@@ -105,33 +108,28 @@ export const stripeRouter = createRouter({
     .input(
       z.object({
         amount: z.number().min(1),
-        email: z.string().email(),
-        items: z.array(
-          z.object({
-            productId: z.number(),
-            quantity: z.number(),
-            color: z.string().optional(),
-            size: z.string().optional(),
-          })
-        ),
+        email: z.string().email().max(320),
+        items: orderItemsInput,
         shipping: z.object({
-          firstName: z.string().optional(),
-          lastName: z.string().optional(),
-          address: z.string().optional(),
-          city: z.string().optional(),
-          postalCode: z.string().optional(),
-          country: z.string().optional(),
-          phone: z.string().optional(),
+          firstName: shortText(100).optional(),
+          lastName: shortText(100).optional(),
+          address: shortText(500).optional(),
+          city: shortText(100).optional(),
+          postalCode: shortText(20).optional(),
+          country: shortText(100).optional(),
+          phone: shortText(30).optional(),
         }).optional(),
-        shippingMethodId: z.number().optional(),
+        shippingMethodId: z.number().int().optional(),
         servicePoint: z.object({
-          id: z.string(),
-          name: z.string(),
-          address: z.string(),
+          id: shortText(100),
+          name: shortText(255),
+          address: shortText(500),
         }).optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // Chaque appel cree une commande : freine les robots.
+      hitRateLimit(`payment-intent:${clientIp(ctx.req)}`, 20, 10 * 60 * 1000);
       const db = getDb();
 
       // Calculate totals
@@ -152,7 +150,8 @@ export const stripeRouter = createRouter({
           .select()
           .from(products)
           .where(eq(products.id, item.productId));
-        if (!product) continue;
+        // Produit supprime ou retire de la vente dans le CRM.
+        if (!product || product.isActive === false) continue;
         const price = parseFloat(String(product.price));
         const itemTotal = price * item.quantity;
         subtotal += itemTotal;
@@ -166,6 +165,10 @@ export const stripeRouter = createRouter({
           size: item.size || null,
           weightGrams: product.weightGrams ?? null,
         });
+      }
+
+      if (orderItemsData.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Ces articles ne sont plus disponibles." });
       }
 
       // Poids reel du panier, emballage compris.
@@ -243,6 +246,7 @@ export const stripeRouter = createRouter({
             orderId,
             orderNumber,
             total,
+            confirmToken: orderConfirmToken(orderId),
           };
         } catch {
           // Stripe failed, fall through to demo mode
@@ -255,6 +259,7 @@ export const stripeRouter = createRouter({
         orderId,
         orderNumber,
         total,
+        confirmToken: orderConfirmToken(orderId),
       };
     }),
 
@@ -262,8 +267,11 @@ export const stripeRouter = createRouter({
     .input(z.object({
       // Absent au retour d'un moyen de paiement qui redirige (PayPal,
       // Klarna...) : la commande est alors retrouvee via le paiement.
-      orderId: z.number().optional(),
-      paymentIntentId: z.string().optional(),
+      orderId: z.number().int().optional(),
+      paymentIntentId: z.string().max(255).optional(),
+      // Remis par createPaymentIntent : prouve que ce navigateur a cree la
+      // commande quand aucun paiement Stripe ne peut le faire (mode demo).
+      confirmToken: z.string().max(200).optional(),
     }).refine((v) => v.orderId !== undefined || !!v.paymentIntentId, {
       message: "orderId ou paymentIntentId requis",
     }))
@@ -300,9 +308,25 @@ export const stripeRouter = createRouter({
           .update(payments)
           .set({ status: "succeeded" })
           .where(eq(payments.stripePaymentIntentId, payment.stripePaymentIntentId));
+      } else if (!isValidOrderConfirmToken(orderId, input.confirmToken)) {
+        // Mode demo : sans ce jeton, n'importe qui pouvait valider (et lire)
+        // la commande d'un autre en essayant les numeros un par un.
+        throw new TRPCError({ code: "FORBIDDEN", message: "Commande introuvable" });
       }
 
       const order = await markOrderPaid(orderId, ctx.req);
-      return { order };
+      // Uniquement ce qu'affiche la page de confirmation : ni adresse, ni
+      // email, ni telephone.
+      return {
+        order: order
+          ? {
+              orderNumber: order.orderNumber,
+              shippingCarrier: order.shippingCarrier,
+              shippingMethodName: order.shippingMethodName,
+              servicePointName: order.servicePointName,
+              servicePointAddress: order.servicePointAddress,
+            }
+          : null,
+      };
     }),
 });

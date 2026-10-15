@@ -303,9 +303,6 @@ sans risque.
 
 ## Points a traiter plus tard
 
-- Les mots de passe sont haches en SHA-256 avec un sel statique partage. C'est
-  faible face a une fuite de base ; passer a bcrypt ou Argon2 obligerait a
-  reinitialiser les mots de passe existants.
 - `db/migrations/` est vide : le projet fonctionne en `db:push`. Pour un
   historique de migrations versionne, passer a `npm run db:generate` puis
   `db:migrate`.

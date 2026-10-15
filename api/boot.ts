@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { compress } from "hono/compress";
+import { securityHeaders } from "./lib/security-headers";
 import type { HttpBindings } from "@hono/node-server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "./router";
@@ -15,7 +16,10 @@ import { Paths } from "@contracts/constants";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
-app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
+// Au-dessus de la plus grosse requete legitime (photo de 8 Mo) : une requete
+// geante n'occupe pas la memoire du serveur pour rien.
+app.use(bodyLimit({ maxSize: 10 * 1024 * 1024 }));
+app.use(securityHeaders);
 // Pages HTML, reponses de l'API et sitemap compresses a la volee. Les
 // fichiers statiques arrivent deja compresses (precompressed) et les images
 // ne sont pas concernees.

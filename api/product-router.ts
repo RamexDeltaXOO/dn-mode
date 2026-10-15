@@ -20,6 +20,12 @@ async function assertSlugAvailable(slug: string, exceptId?: number): Promise<voi
   }
 }
 
+/** Un produit retire de la vente n'est visible que depuis le CRM. */
+function visibleTo<T extends { isActive: boolean | null }>(product: T | undefined, role?: string): T | null {
+  if (!product) return null;
+  return product.isActive === false && role !== "admin" ? null : product;
+}
+
 export const productRouter = createRouter({
   list: publicQuery
     .input(
@@ -32,7 +38,7 @@ export const productRouter = createRouter({
         includeInactive: z.boolean().optional(),
       }).optional()
     )
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const db = getDb();
       const filters = [];
 
@@ -50,9 +56,11 @@ export const productRouter = createRouter({
           filters.push(eq(products.isFeatured, true));
         }
         if (input.search) {
-          filters.push(like(products.name, `%${input.search}%`));
+          // % et _ pris au pied de la lettre, pas comme jokers SQL.
+          filters.push(like(products.name, `%${input.search.replace(/[\\%_]/g, "\\$&")}%`));
         }
-        if (!input.includeInactive) {
+        // Les produits retires de la vente ne sont listes que pour le CRM.
+        if (!input.includeInactive || ctx.user?.role !== "admin") {
           filters.push(eq(products.isActive, true));
         }
       } else {
@@ -82,19 +90,19 @@ export const productRouter = createRouter({
     }),
 
   getBySlug: publicQuery
-    .input(z.object({ slug: z.string() }))
-    .query(async ({ input }) => {
+    .input(z.object({ slug: z.string().max(255) }))
+    .query(async ({ ctx, input }) => {
       const db = getDb();
       const [product] = await db.select().from(products).where(eq(products.slug, input.slug));
-      return product || null;
+      return visibleTo(product, ctx.user?.role);
     }),
 
   getById: publicQuery
-    .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .input(z.object({ id: z.number().int() }))
+    .query(async ({ ctx, input }) => {
       const db = getDb();
       const [product] = await db.select().from(products).where(eq(products.id, input.id));
-      return product || null;
+      return visibleTo(product, ctx.user?.role);
     }),
 
   create: adminQuery

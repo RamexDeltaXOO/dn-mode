@@ -20,7 +20,11 @@ export const googleAuthRouter = createRouter({
   }),
 
   getAuthUrl: publicQuery
-    .input(z.object({ redirectTo: z.string().optional() }))
+    .input(z.object({
+      redirectTo: z.string().max(500).optional(),
+      // Tire au hasard par le navigateur, verifie au retour (voir encodeState).
+      nonce: z.string().min(16).max(100),
+    }))
     .query(async ({ ctx, input }) => {
       const creds = await getGoogleCredentials();
       if (!creds.enabled) return { url: null };
@@ -31,7 +35,7 @@ export const googleAuthRouter = createRouter({
         url: buildAuthUrl({
           clientId: creds.clientId,
           redirectUri: buildRedirectUri(originFromRequest(ctx.req)),
-          state: encodeState(input.redirectTo ?? "/"),
+          state: encodeState(input.redirectTo ?? "/", input.nonce),
         }),
       };
     }),

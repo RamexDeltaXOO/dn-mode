@@ -6,20 +6,20 @@ import { users } from "@db/schema";
 import { SESSION_MAX_AGE_MS } from "@contracts/constants";
 import { env } from "./lib/env";
 import { TRPCError } from "@trpc/server";
+import { hashPassword, needsRehash, verifyAgainstDecoy, verifyPassword } from "./lib/password";
+import { clientIp, hitRateLimit, resetRateLimit } from "./lib/rate-limit";
 
-// Password hashing using Web Crypto API (SHA-256 with salt)
-export async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + "dnmode-salt-2026-v2");
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
+const FIFTEEN_MINUTES = 15 * 60 * 1000;
+const ONE_HOUR = 60 * 60 * 1000;
 
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const computed = await hashPassword(password);
-  return computed === hash;
-}
+/** Champs du compte renvoyes au navigateur : jamais le hash du mot de passe. */
+const publicUserFields = {
+  id: users.id,
+  email: users.email,
+  name: users.name,
+  avatar: users.avatar,
+  role: users.role,
+};
 
 // ── Jetons de session (JWT HS256 signes avec APP_SECRET) ────
 export type TokenPayload = { sub: number; email: string; role: string; iat: number; exp: number };
@@ -27,7 +27,7 @@ export type TokenPayload = { sub: number; email: string; role: string; iat: numb
 const encoder = new TextEncoder();
 
 /** En developpement APP_SECRET peut etre vide ; en production env.ts l'exige. */
-function signingSecret(): string {
+export function signingSecret(): string {
   return env.appSecret || "dnmode-dev-secret-do-not-use-in-production";
 }
 
@@ -98,11 +98,13 @@ export async function verifyLocalToken(token: string): Promise<TokenPayload | nu
 export const localAuthRouter = createRouter({
   register: publicQuery
     .input(z.object({
-      email: z.string().email(),
-      password: z.string().min(6),
-      name: z.string().optional(),
+      email: z.string().email().max(320),
+      password: z.string().min(8, "Le mot de passe doit faire au moins 8 caracteres").max(200),
+      name: z.string().max(255).optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      // Freine la creation de comptes en masse.
+      hitRateLimit(`register:${clientIp(ctx.req)}`, 5, ONE_HOUR);
       const db = getDb();
 
       // Check if email exists
@@ -131,21 +133,41 @@ export const localAuthRouter = createRouter({
 
   loginPassword: publicQuery
     .input(z.object({
-      email: z.string().email(),
-      password: z.string().min(1),
+      email: z.string().email().max(320),
+      password: z.string().min(1).max(200),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      // Essais de mots de passe en rafale : limites par compte vise et par
+      // adresse IP. Le compteur du compte repart a zero apres une connexion.
+      const accountKey = `login:${input.email.toLowerCase()}`;
+      hitRateLimit(accountKey, 10, FIFTEEN_MINUTES);
+      hitRateLimit(`login-ip:${clientIp(ctx.req)}`, 30, FIFTEEN_MINUTES);
+
       const db = getDb();
 
       const [user] = await db.select().from(users).where(eq(users.email, input.email));
       if (!user) {
+        await verifyAgainstDecoy(input.password);
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Email ou mot de passe incorrect" });
       }
 
-      // Verify password
-      const isValid = await verifyPassword(input.password, user.passwordHash || "");
+      const isValid = await verifyPassword(input.password, user.passwordHash);
       if (!isValid) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Email ou mot de passe incorrect" });
+      }
+      resetRateLimit(accountKey);
+
+      // Ancien hash SHA-256 : converti en scrypt maintenant que le mot de
+      // passe en clair est connu. Transparent pour le client.
+      if (needsRehash(user.passwordHash)) {
+        try {
+          await db
+            .update(users)
+            .set({ passwordHash: await hashPassword(input.password) })
+            .where(eq(users.id, user.id));
+        } catch (error) {
+          console.error("[auth] password rehash failed", error);
+        }
       }
 
       const token = await generateToken(user.id, user.email || "", user.role);
@@ -163,9 +185,7 @@ export const localAuthRouter = createRouter({
     if (!payload) return null;
 
     const db = getDb();
-    const [user] = await db.select().from(users).where(eq(users.id, payload.sub));
-    if (!user) return null;
-
-    return user;
+    const [user] = await db.select(publicUserFields).from(users).where(eq(users.id, payload.sub));
+    return user ?? null;
   }),
 });

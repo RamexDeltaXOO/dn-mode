@@ -4,6 +4,7 @@ import { trpc } from "@/providers/trpc";
 import { LogIn, UserPlus } from "lucide-react";
 import { pageTitle } from "@contracts/seo";
 import { useSeo } from "@/hooks/useSeo";
+import { OAUTH_NONCE_KEY } from "@/lib/oauth";
 
 const GOOGLE_ERRORS: Record<string, string> = {
   google_denied: "Connexion Google annulee.",
@@ -84,7 +85,11 @@ export default function Login() {
     setError("");
     setGooglePending(true);
     try {
-      const result = await utils.googleAuth.getAuthUrl.fetch({ redirectTo: "/" });
+      // Code garde dans cet onglet et verifie au retour de Google : seul un
+      // parcours commence ici peut aboutir a une connexion.
+      const nonce = crypto.randomUUID();
+      sessionStorage.setItem(OAUTH_NONCE_KEY, nonce);
+      const result = await utils.googleAuth.getAuthUrl.fetch({ redirectTo: "/", nonce });
       if (result?.url) {
         window.location.href = result.url;
         return;
@@ -190,11 +195,11 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={6}
+              minLength={mode === "register" ? 8 : undefined}
               className="w-full border border-[#e0e0e0] px-3 py-2.5 text-[0.875rem] outline-none focus:border-[#222222]"
             />
             {mode === "register" && (
-              <p className="text-[0.625rem] text-[#999999] mt-1">Minimum 6 caracteres</p>
+              <p className="text-[0.625rem] text-[#999999] mt-1">Minimum 8 caracteres</p>
             )}
           </div>
 

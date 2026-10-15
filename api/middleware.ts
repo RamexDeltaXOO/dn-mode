@@ -6,8 +6,14 @@ import { describeDbError } from "./lib/db-errors";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
-  errorFormatter({ shape, error }) {
+  errorFormatter({ shape, error, ctx }) {
     if (error.code !== "INTERNAL_SERVER_ERROR") return shape;
+    // Un visiteur n'a pas a lire le detail technique (requete SQL, structure
+    // de la base, reponse d'un prestataire) : message generique, le detail
+    // reste dans les journaux du serveur.
+    if (ctx?.user?.role !== "admin") {
+      return { ...shape, message: "Une erreur est survenue. Merci de reessayer." };
+    }
     // Remplace « Failed query: ... params: ... » par la vraie raison MySQL.
     const message = describeDbError(error.cause ?? error);
     return message ? { ...shape, message } : shape;

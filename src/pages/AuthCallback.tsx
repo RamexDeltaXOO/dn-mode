@@ -1,17 +1,31 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { safeRedirectPath } from "@contracts/constants";
+import { OAUTH_NONCE_KEY } from "@/lib/oauth";
 
-/** Lit le jeton depuis le fragment d'URL (#token=...&redirect=...). */
+/**
+ * Lit le jeton depuis le fragment d'URL (#token=...&redirect=...&nonce=...).
+ * Le jeton n'est accepte que si `nonce` est celui tire par cet onglet au
+ * depart vers Google : un lien envoye par quelqu'un d'autre ne connecte pas
+ * le visiteur a un compte qui n'est pas le sien.
+ */
 function readCallbackHash(): { token: string | null; redirect: string } {
   if (typeof window === "undefined") return { token: null, redirect: "/" };
   const hash = window.location.hash.startsWith("#")
     ? window.location.hash.slice(1)
     : window.location.hash;
   const params = new URLSearchParams(hash);
-  const redirect = params.get("redirect") || "/";
+  let expected: string | null = null;
+  try {
+    expected = sessionStorage.getItem(OAUTH_NONCE_KEY);
+    sessionStorage.removeItem(OAUTH_NONCE_KEY);
+  } catch {
+    expected = null;
+  }
+  const nonce = params.get("nonce");
   return {
-    token: params.get("token"),
-    redirect: redirect.startsWith("/") ? redirect : "/",
+    token: expected && nonce === expected ? params.get("token") : null,
+    redirect: safeRedirectPath(params.get("redirect")),
   };
 }
 

@@ -139,7 +139,7 @@ export const emailRouter = createRouter({
 
       return {
         subject: renderTemplate(resolved.subject, vars),
-        html: renderTemplate(resolved.htmlBody, vars),
+        html: renderTemplate(resolved.htmlBody, vars, "html"),
         textBody: resolved.textBody ? renderTemplate(resolved.textBody, vars) : null,
         source: resolved.source,
       };

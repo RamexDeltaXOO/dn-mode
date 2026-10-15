@@ -169,7 +169,7 @@ export default function AdminCampaigns() {
               {form.htmlContent && (
                 <div className="border border-[#e0e0e0]">
                   <div className="bg-[#f4f4f4] px-3 py-2 text-[0.625rem] uppercase tracking-[1px] text-[#999999]">Apercu en direct</div>
-                  <iframe srcDoc={form.htmlContent.replace(/{{shopUrl}}/g, window.location.origin)} className="w-full h-[250px] border-0" />
+                  <iframe sandbox="" srcDoc={form.htmlContent.replace(/{{shopUrl}}/g, window.location.origin)} className="w-full h-[250px] border-0" />
                 </div>
               )}
 
@@ -190,7 +190,7 @@ export default function AdminCampaigns() {
               <h3 className="text-[0.875rem] font-medium">{previewCampaign.name}</h3>
               <button onClick={() => setPreviewId(null)}><X size={16} /></button>
             </div>
-            <iframe srcDoc={previewCampaign.htmlContent.replace(/{{shopUrl}}/g, window.location.origin)} className="w-full h-[500px] border-0" />
+            <iframe sandbox="" srcDoc={previewCampaign.htmlContent.replace(/{{shopUrl}}/g, window.location.origin)} className="w-full h-[500px] border-0" />
           </div>
         </div>
       )}

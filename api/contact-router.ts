@@ -9,6 +9,7 @@ import { getConfigValue } from "./lib/site-config";
 import { getSupportEmail, sendTemplateEmail } from "./lib/mailer";
 import { escapeHtml } from "./lib/email-templates";
 import { resolveShopUrl } from "./order-router";
+import { clientIp, hitRateLimit } from "./lib/rate-limit";
 
 /** Reference lisible d'un ticket SAV. */
 function ticketRef(id: number): string {
@@ -34,13 +35,16 @@ async function savVariables(contact: Contact, req?: Request) {
 export const contactRouter = createRouter({
   create: publicQuery
     .input(z.object({
-      name: z.string().min(1),
-      email: z.string().email(),
-      message: z.string().min(1),
-      subject: z.string().optional(),
-      orderNumber: z.string().optional(),
+      name: z.string().trim().min(1).max(100),
+      email: z.string().email().max(320),
+      message: z.string().trim().min(1).max(5000),
+      subject: z.string().trim().max(200).optional(),
+      orderNumber: z.string().trim().max(50).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // Chaque message declenche un accuse de reception : freine les robots
+      // qui s'en serviraient pour envoyer des emails au nom de la boutique.
+      hitRateLimit(`contact:${clientIp(ctx.req)}`, 5, 10 * 60 * 1000);
       const db = getDb();
       const result = await db.insert(contacts).values({
         name: input.name,

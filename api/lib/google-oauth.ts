@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import { eq } from "drizzle-orm";
-import { ConfigKeys, Paths } from "@contracts/constants";
+import { ConfigKeys, Paths, safeRedirectPath } from "@contracts/constants";
 import type { User } from "@db/schema";
 import { users } from "@db/schema";
 import { getConfigValue } from "./site-config";
@@ -69,29 +69,31 @@ export function buildAuthUrl(input: {
   return `${AUTH_ENDPOINT}?${params.toString()}`;
 }
 
-// ── State (protege contre les redirections ouvertes) ────────
-export function encodeState(redirectTo: string): string {
-  return Buffer.from(JSON.stringify({ redirectTo: sanitizeRedirect(redirectTo) })).toString(
+// ── State ───────────────────────────────────────────────────
+// `nonce` est tire au hasard par le navigateur et garde dans son onglet
+// (sessionStorage). Il fait l'aller-retour chez Google et revient a
+// /auth/callback, qui refuse le jeton s'il ne correspond pas : un lien de
+// connexion fabrique par quelqu'un d'autre ne peut pas connecter le visiteur
+// au compte de cette personne (et lui faire passer commande dessus).
+export function encodeState(redirectTo: string, nonce: string): string {
+  return Buffer.from(JSON.stringify({ redirectTo: safeRedirectPath(redirectTo), nonce })).toString(
     "base64url",
   );
 }
 
-export function decodeState(state: string): string {
+export function decodeState(state: string): { redirectTo: string; nonce: string } {
   try {
     const parsed = JSON.parse(Buffer.from(state, "base64url").toString("utf8")) as {
       redirectTo?: unknown;
+      nonce?: unknown;
     };
-    return sanitizeRedirect(String(parsed.redirectTo ?? "/"));
+    return {
+      redirectTo: safeRedirectPath(String(parsed.redirectTo ?? "/")),
+      nonce: typeof parsed.nonce === "string" ? parsed.nonce : "",
+    };
   } catch {
-    return "/";
+    return { redirectTo: "/", nonce: "" };
   }
-}
-
-/** N'autorise que les chemins internes ("/quelque-chose"), jamais une URL absolue. */
-export function sanitizeRedirect(value: string): string {
-  if (!value || typeof value !== "string") return "/";
-  if (!value.startsWith("/") || value.startsWith("//")) return "/";
-  return value;
 }
 
 // ── Echange du code + profil ────────────────────────────────
@@ -185,6 +187,12 @@ export async function findOrCreateGoogleUser(profile: GoogleProfile): Promise<Us
 
     const [byEmail] = await db.select().from(users).where(eq(users.email, profile.email));
     if (byEmail) {
+      // L'inscription par mot de passe ne verifie pas l'adresse email :
+      // quelqu'un a pu creer ce compte avec l'adresse d'un autre en
+      // attendant que le vrai proprietaire se connecte avec Google. Google
+      // vient de prouver qui possede l'adresse, donc le mot de passe pose
+      // avant est retire (hors administrateur, cree par le proprietaire).
+      const dropPassword = !byEmail.googleId && byEmail.role !== "admin";
       await db
         .update(users)
         .set({
@@ -193,6 +201,7 @@ export async function findOrCreateGoogleUser(profile: GoogleProfile): Promise<Us
           avatar: byEmail.avatar ?? profile.picture,
           name: byEmail.name ?? profile.name,
           lastSignInAt: new Date(),
+          ...(dropPassword ? { passwordHash: null } : {}),
         })
         .where(eq(users.id, byEmail.id));
       return { ...byEmail, googleId: profile.sub, provider: "google" };
@@ -237,7 +246,7 @@ export function createGoogleCallbackHandler() {
       // dans Google Cloud.
       const origin = originFromRequest(c.req.raw);
       const redirectUri = buildRedirectUri(origin);
-      const redirectTo = state ? decodeState(state) : "/";
+      const { redirectTo, nonce } = state ? decodeState(state) : { redirectTo: "/", nonce: "" };
 
       const token = await exchangeCode({ code, redirectUri });
       if (!token) return c.redirect(`${Paths.login}?error=google_token`, 302);
@@ -256,7 +265,7 @@ export function createGoogleCallbackHandler() {
       // Le jeton passe par le FRAGMENT d'URL : il n'est ni journalise par les
       // proxies ni envoye au serveur lors de la redirection finale.
       return c.redirect(
-        `${Paths.authCallback}#token=${encodeURIComponent(sessionToken)}&redirect=${encodeURIComponent(redirectTo)}`,
+        `${Paths.authCallback}#token=${encodeURIComponent(sessionToken)}&redirect=${encodeURIComponent(redirectTo)}&nonce=${encodeURIComponent(nonce)}`,
         302,
       );
     } catch (err) {

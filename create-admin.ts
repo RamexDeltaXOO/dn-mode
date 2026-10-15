@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "./api/queries/connection";
 import { users } from "./db/schema";
-import { hashPassword } from "./api/local-auth-router";
+import { hashPassword } from "./api/lib/password";
 
 /**
  * Cree (ou met a jour) le compte administrateur du CRM.

@@ -7,7 +7,38 @@ import { carts, cartItems, products } from "@db/schema";
 import { TRPCError } from "@trpc/server";
 
 function getSessionId(headers: Headers): string | null {
-  return headers.get("x-session-id");
+  const id = headers.get("x-session-id");
+  // Identifiant genere par le navigateur (UUID) : rien d'autre n'est accepte.
+  return id && id.length <= 100 ? id : null;
+}
+
+/** Panier du visiteur courant (compte connecte, sinon session), sans le creer. */
+async function findCurrentCart(headers: Headers, userId: number | undefined) {
+  const db = getDb();
+  const sessionId = getSessionId(headers);
+  let cart;
+  if (userId) {
+    [cart] = await db.select().from(carts).where(eq(carts.userId, userId));
+  }
+  if (!cart && sessionId) {
+    [cart] = await db.select().from(carts).where(eq(carts.sessionId, sessionId));
+  }
+  return cart ?? null;
+}
+
+/**
+ * Ligne de panier appartenant au visiteur courant. Les identifiants de ligne
+ * se suivent : sans cette verification, n'importe qui pouvait vider ou
+ * modifier le panier des autres clients.
+ */
+async function findOwnItem(headers: Headers, userId: number | undefined, itemId: number) {
+  const cart = await findCurrentCart(headers, userId);
+  if (!cart) return null;
+  const [item] = await getDb()
+    .select()
+    .from(cartItems)
+    .where(and(eq(cartItems.id, itemId), eq(cartItems.cartId, cart.id)));
+  return item ?? null;
 }
 
 export const cartRouter = createRouter({
@@ -55,10 +86,10 @@ export const cartRouter = createRouter({
 
   addItem: publicQuery
     .input(z.object({
-      productId: z.number(),
-      quantity: z.number().min(1).default(1),
-      color: z.string().optional(),
-      size: z.string().optional(),
+      productId: z.number().int().positive(),
+      quantity: z.number().int().min(1).max(99).default(1),
+      color: z.string().max(100).optional(),
+      size: z.string().max(50).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -99,7 +130,9 @@ export const cartRouter = createRouter({
 
       // Stock de la variante choisie (couleur x taille).
       const [product] = await db.select().from(products).where(eq(products.id, input.productId));
-      if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable" });
+      if (!product || product.isActive === false) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable" });
+      }
       const available = stockFor(product, color, size);
       if ((existing?.quantity ?? 0) + input.quantity > available) {
         throw new TRPCError({
@@ -129,16 +162,16 @@ export const cartRouter = createRouter({
 
   updateItem: publicQuery
     .input(z.object({
-      itemId: z.number(),
-      quantity: z.number().min(0),
+      itemId: z.number().int(),
+      quantity: z.number().int().min(0).max(99),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = getDb();
+      const item = await findOwnItem(ctx.req.headers, ctx.user?.id, input.itemId);
+      if (!item) throw new TRPCError({ code: "NOT_FOUND", message: "Article introuvable" });
       if (input.quantity === 0) {
-        await db.delete(cartItems).where(eq(cartItems.id, input.itemId));
+        await db.delete(cartItems).where(eq(cartItems.id, item.id));
       } else {
-        const [item] = await db.select().from(cartItems).where(eq(cartItems.id, input.itemId));
-        if (!item) throw new TRPCError({ code: "NOT_FOUND", message: "Article introuvable" });
         const [product] = await db.select().from(products).where(eq(products.id, item.productId));
         const available = product ? stockFor(product, item.color, item.size) : 0;
         // Baisser la quantite reste toujours possible.
@@ -148,34 +181,23 @@ export const cartRouter = createRouter({
             message: `Plus que ${available} piece(s) disponible(s) pour cette variante`,
           });
         }
-        await db.update(cartItems).set({ quantity: input.quantity }).where(eq(cartItems.id, input.itemId));
+        await db.update(cartItems).set({ quantity: input.quantity }).where(eq(cartItems.id, item.id));
       }
       return { success: true };
     }),
 
   removeItem: publicQuery
-    .input(z.object({ itemId: z.number() }))
-    .mutation(async ({ input }) => {
-      const db = getDb();
-      await db.delete(cartItems).where(eq(cartItems.id, input.itemId));
+    .input(z.object({ itemId: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      const item = await findOwnItem(ctx.req.headers, ctx.user?.id, input.itemId);
+      if (item) await getDb().delete(cartItems).where(eq(cartItems.id, item.id));
       return { success: true };
     }),
 
   clear: publicQuery.mutation(async ({ ctx }) => {
-    const db = getDb();
-    const sessionId = getSessionId(ctx.req.headers);
-    const userId = ctx.user?.id;
-
-    let cart;
-    if (userId) {
-      [cart] = await db.select().from(carts).where(eq(carts.userId, userId));
-    }
-    if (!cart && sessionId) {
-      [cart] = await db.select().from(carts).where(eq(carts.sessionId, sessionId));
-    }
-
+    const cart = await findCurrentCart(ctx.req.headers, ctx.user?.id);
     if (cart) {
-      await db.delete(cartItems).where(eq(cartItems.cartId, cart.id));
+      await getDb().delete(cartItems).where(eq(cartItems.cartId, cart.id));
     }
 
     return { success: true };

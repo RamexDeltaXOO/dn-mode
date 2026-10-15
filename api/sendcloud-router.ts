@@ -228,11 +228,15 @@ export const sendcloudRouter = createRouter({
     }),
 
   tracking: publicQuery
-    .input(z.object({ orderId: z.number() }))
-    .query(async ({ input }) => {
+    .input(z.object({ orderId: z.number().int() }))
+    .query(async ({ ctx, input }) => {
       const db = getDb();
       const [order] = await db.select().from(orders).where(eq(orders.id, input.orderId));
-      if (!order) return null;
+      // Meme regle que order.getById : le client de la commande ou le CRM.
+      // Les numeros se suivent, sans cette verification n'importe qui lisait
+      // le suivi de toutes les commandes.
+      const isOwner = order?.userId != null && order.userId === ctx.user?.id;
+      if (!order || (ctx.user?.role !== "admin" && !isOwner)) return null;
 
       let trackingNumber = order.trackingNumber;
       let trackingUrl = order.trackingUrl;

@@ -3,11 +3,22 @@ import { eq, sql, desc, gte } from "drizzle-orm";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { pageViews, productViews, products } from "@db/schema";
+import { clientIp, overRateLimit } from "./lib/rate-limit";
+
+// Au-dela, les visites ne sont plus enregistrees (sans erreur pour le
+// visiteur) : un robot ne peut pas remplir la base de fausses statistiques.
+const TRACK_LIMIT = 120;
+const TRACK_WINDOW = 60 * 1000;
 
 export const analyticsRouter = createRouter({
   trackPageView: publicQuery
-    .input(z.object({ page: z.string(), sessionId: z.string().optional(), referrer: z.string().optional() }))
+    .input(z.object({
+      page: z.string().max(255),
+      sessionId: z.string().max(100).optional(),
+      referrer: z.string().max(500).optional(),
+    }))
     .mutation(async ({ input, ctx }) => {
+      if (overRateLimit(`track:${clientIp(ctx.req)}`, TRACK_LIMIT, TRACK_WINDOW)) return { success: true };
       const db = getDb();
       const ip = ctx.req.headers.get("x-forwarded-for") || "unknown";
       const ipHash = await hashIp(ip);
@@ -21,8 +32,9 @@ export const analyticsRouter = createRouter({
     }),
 
   trackProductView: publicQuery
-    .input(z.object({ productId: z.number(), sessionId: z.string().optional() }))
+    .input(z.object({ productId: z.number().int(), sessionId: z.string().max(100).optional() }))
     .mutation(async ({ input, ctx }) => {
+      if (overRateLimit(`track:${clientIp(ctx.req)}`, TRACK_LIMIT, TRACK_WINDOW)) return { success: true };
       const db = getDb();
       const ip = ctx.req.headers.get("x-forwarded-for") || "unknown";
       const ipHash = await hashIp(ip);

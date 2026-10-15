@@ -3,7 +3,7 @@ import { ConfigKeys } from "@contracts/constants";
 import { emailTemplates } from "@db/schema";
 import { getDb } from "../queries/connection";
 import { getConfigValue } from "./site-config";
-import { findDefaultTemplate } from "./email-templates";
+import { escapeHtml, findDefaultTemplate } from "./email-templates";
 
 /**
  * Envoi des emails transactionnels.
@@ -41,10 +41,34 @@ export async function getSupportEmail(): Promise<string> {
   return getConfigValue(ConfigKeys.contactEmail, { fallback: "sav@dnmode.fr" });
 }
 
-/** Remplace les {{variables}} d'un gabarit (valeur absente -> chaine vide). */
-export function renderTemplate(tpl: string, vars: Record<string, string>): string {
+/**
+ * Variables dont la valeur est deja du HTML construit (et echappe) par le
+ * serveur. Toutes les autres sont echappees dans le corps HTML : un prenom ou
+ * un sujet saisi par un visiteur ne peut pas glisser un faux lien ou un faux
+ * message dans un email envoye au nom de la boutique.
+ */
+const HTML_VARIABLES = new Set([
+  "itemsHtml",
+  "shippingAddress",
+  "servicePointBlock",
+  "customerMessage",
+  "replyMessage",
+]);
+
+/**
+ * Remplace les {{variables}} d'un gabarit (valeur absente -> chaine vide).
+ * `html` pour le corps HTML ; l'objet et la version texte restent bruts.
+ */
+export function renderTemplate(
+  tpl: string,
+  vars: Record<string, string>,
+  mode: "text" | "html" = "text",
+): string {
   if (!tpl) return "";
-  return tpl.replace(/\{\{\s*(\w+)\s*\}\}/g, (_match, name: string) => vars[name] ?? "");
+  return tpl.replace(/\{\{\s*(\w+)\s*\}\}/g, (_match, name: string) => {
+    const value = vars[name] ?? "";
+    return mode === "html" && !HTML_VARIABLES.has(name) ? escapeHtml(value) : value;
+  });
 }
 
 export async function sendRawEmail(opts: {
@@ -123,7 +147,7 @@ export async function sendTemplateEmail(opts: {
   return sendRawEmail({
     to: opts.to,
     subject: renderTemplate(source.subject, vars),
-    html: renderTemplate(source.htmlBody, vars),
+    html: renderTemplate(source.htmlBody, vars, "html"),
     text: source.textBody ? renderTemplate(source.textBody, vars) : undefined,
     replyTo: opts.replyTo,
   });

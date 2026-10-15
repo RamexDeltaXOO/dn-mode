@@ -6,6 +6,16 @@ export const ErrorMessages = {
 /** Duree de validite d'un jeton de session (7 jours). */
 export const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+/**
+ * Chemin interne sur ("/compte"), sinon "/". Refuse les URL absolues et les
+ * formes que les navigateurs lisent comme un autre site ("//pirate.fr",
+ * "/\\pirate.fr").
+ */
+export function safeRedirectPath(value: string | null | undefined): string {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || /[\\\s]/.test(value)) return "/";
+  return value;
+}
+
 export const Paths = {
   login: "/login",
   googleAuthStart: "/api/auth/google",

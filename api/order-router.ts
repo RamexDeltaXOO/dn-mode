@@ -11,6 +11,7 @@ import { buildOrderItemsHtml, escapeHtml } from "./lib/email-templates";
 import { getSupportEmail, sendTemplateEmail } from "./lib/mailer";
 import { originFromRequest } from "./lib/request-origin";
 import { contentWeightGrams, getWeightSettings } from "./lib/weight";
+import { orderItemsInput, shortText } from "./lib/order-input";
 
 export type OrderEmailItem = {
   productName: string;
@@ -33,16 +34,33 @@ function generateOrderNumber(): string {
   return `DNM-${day}-${suffix}`;
 }
 
-/** URL publique de la boutique : origine reelle de la requete, sinon config. */
+/**
+ * URL publique de la boutique, pour les liens des emails : le domaine
+ * officiel (CRM, sinon PUBLIC_APP_URL). L'origine de la requete n'est reprise
+ * que si elle designe ce meme domaine (avec ou sans www) ou un poste local :
+ * elle vient d'en-tetes que le client peut forger, et un email de commande ne
+ * doit jamais renvoyer vers un autre site.
+ */
 export async function resolveShopUrl(req?: Request): Promise<string> {
-  if (req) {
-    const origin = originFromRequest(req);
-    if (origin) return origin;
+  const configured = (
+    await getConfigValue(ConfigKeys.siteUrl, {
+      envKey: "PUBLIC_APP_URL",
+      fallback: "https://dnmode.fr",
+    })
+  ).replace(/\/+$/, "");
+  if (!req) return configured;
+
+  const origin = originFromRequest(req);
+  try {
+    const host = new URL(origin).hostname;
+    const official = new URL(configured).hostname.replace(/^www\./, "");
+    if (host.replace(/^www\./, "") === official || host === "localhost" || host === "127.0.0.1") {
+      return origin;
+    }
+  } catch {
+    // Origine ou configuration illisible : domaine officiel.
   }
-  return getConfigValue(ConfigKeys.siteUrl, {
-    envKey: "PUBLIC_APP_URL",
-    fallback: "https://dnmode.fr",
-  });
+  return configured;
 }
 
 /** Construit le jeu de variables attendu par les gabarits de commande. */
@@ -119,26 +137,25 @@ async function safeSendOrderEmail(
 }
 
 export const orderRouter = createRouter({
-  create: publicQuery
+  // Saisie d'une commande sans paiement : reservee au CRM. La boutique passe
+  // par stripe.createPaymentIntent ; publique, cette route permettait a
+  // n'importe qui de creer des commandes et d'envoyer des emails de
+  // confirmation a n'importe quelle adresse.
+  create: adminQuery
     .input(z.object({
-      email: z.string().email(),
-      firstName: z.string().optional(),
-      lastName: z.string().optional(),
-      address: z.string().optional(),
-      city: z.string().optional(),
-      postalCode: z.string().optional(),
-      country: z.string().optional(),
-      phone: z.string().optional(),
-      shippingMethodId: z.number().optional(),
-      servicePointId: z.string().optional(),
-      servicePointName: z.string().optional(),
-      servicePointAddress: z.string().optional(),
-      items: z.array(z.object({
-        productId: z.number(),
-        quantity: z.number(),
-        color: z.string().optional(),
-        size: z.string().optional(),
-      })),
+      email: z.string().email().max(320),
+      firstName: shortText(100).optional(),
+      lastName: shortText(100).optional(),
+      address: shortText(500).optional(),
+      city: shortText(100).optional(),
+      postalCode: shortText(20).optional(),
+      country: shortText(100).optional(),
+      phone: shortText(30).optional(),
+      shippingMethodId: z.number().int().optional(),
+      servicePointId: shortText(100).optional(),
+      servicePointName: shortText(255).optional(),
+      servicePointAddress: shortText(500).optional(),
+      items: orderItemsInput,
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -149,7 +166,7 @@ export const orderRouter = createRouter({
 
       for (const item of input.items) {
         const [product] = await db.select().from(products).where(eq(products.id, item.productId));
-        if (!product) continue;
+        if (!product || product.isActive === false) continue;
         const price = parseFloat(product.price as string);
         const itemTotal = price * item.quantity;
         subtotal += itemTotal;

@@ -212,3 +212,35 @@ canonique a jour quand on change de page sans recharger.
 2. Bing Webmaster Tools : importer le site depuis Search Console.
 3. Pour chaque produit, remplir la **description courte** (une phrase, 160
    caracteres max) : c'est le texte affiche sous le titre dans Google.
+
+## Securite
+
+Rien a configurer. Ce qui est en place :
+
+- **Mots de passe** haches en scrypt avec un sel propre a chaque compte
+  (`api/lib/password.ts`). Les anciens hash SHA-256 sont convertis a la
+  connexion suivante, sans reinitialisation. 8 caracteres minimum a
+  l'inscription.
+- **Tentatives limitees** (`api/lib/rate-limit.ts`) : 10 essais de mot de
+  passe par compte et 30 par adresse IP sur 15 minutes, 5 inscriptions par
+  heure, 5 messages de contact ou inscriptions newsletter par 10 minutes,
+  20 commandes par 10 minutes.
+- **Commandes** : quantites entieres de 1 a 99, prix toujours relus en base,
+  produits retires de la vente refuses. La confirmation d'une commande sans
+  paiement Stripe (mode demo) exige le jeton remis a sa creation.
+- **Donnees des clients** : panier, suivi de colis et details de commande ne
+  sont accessibles qu'a leur proprietaire ou au CRM. Les erreurs techniques
+  ne sont detaillees qu'a l'administrateur.
+- **Emails** : les textes saisis par les visiteurs (nom, sujet...) sont
+  echappes, les liens pointent toujours vers le domaine officiel.
+- **Connexion Google** liee a l'onglet qui l'a commencee (aucun lien
+  fabrique par un tiers ne peut connecter un visiteur a un autre compte),
+  redirections limitees aux pages du site.
+- **En-tetes HTTP** (`api/lib/security-headers.ts`) : Content-Security-Policy,
+  HSTS, interdiction d'afficher le site dans un cadre, etc.
+
+Pour ajouter un service externe qui charge un script ou appelle une API
+depuis le navigateur (statistiques, chat, pixel publicitaire...), declarer
+son domaine dans `api/lib/security-headers.ts` : sinon le navigateur le
+bloque.
+

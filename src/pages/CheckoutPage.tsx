@@ -116,9 +116,10 @@ function PaymentReturn({ paymentIntentId, redirectStatus }: { paymentIntentId: s
   );
 }
 
-function CheckoutForm({ clientSecret, orderId, orderNumber, total, carrierName, servicePoint }: {
+function CheckoutForm({ clientSecret, orderId, confirmToken, orderNumber, total, carrierName, servicePoint }: {
   clientSecret: string;
   orderId: number;
+  confirmToken: string;
   orderNumber: string;
   total: number;
   carrierName: string | null;
@@ -144,7 +145,7 @@ function CheckoutForm({ clientSecret, orderId, orderNumber, total, carrierName, 
 
     if (clientSecret === "pi_demo_secret") {
       await new Promise((r) => setTimeout(r, 1500));
-      confirmPayment.mutate({ orderId });
+      confirmPayment.mutate({ orderId, confirmToken });
       setMessage("success");
       setIsProcessing(false);
       return;
@@ -239,6 +240,7 @@ function CheckoutFlow() {
   const [paymentData, setPaymentData] = useState<{
     clientSecret: string;
     orderId: number;
+    confirmToken: string;
     orderNumber: string;
     total: number;
   } | null>(null);
@@ -418,6 +420,7 @@ function CheckoutFlow() {
                 <CheckoutForm
                   clientSecret={paymentData.clientSecret}
                   orderId={paymentData.orderId}
+                  confirmToken={paymentData.confirmToken}
                   orderNumber={paymentData.orderNumber}
                   total={paymentData.total}
                   carrierName={
