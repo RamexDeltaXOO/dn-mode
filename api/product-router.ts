@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { eq, ne, like, and, sql } from "drizzle-orm";
+import { eq, ne, like, and, sql, inArray } from "drizzle-orm";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
+import { affectedRows, bulkIdsInput } from "./lib/bulk";
 import { products } from "@db/schema";
 
 /** Refuse un slug deja pris, avec un message clair plutot qu'une erreur MySQL. */
@@ -176,5 +177,13 @@ export const productRouter = createRouter({
       const db = getDb();
       await db.delete(products).where(eq(products.id, input.id));
       return { success: true };
+    }),
+
+  deleteMany: adminQuery
+    .input(bulkIdsInput)
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const result = await db.delete(products).where(inArray(products.id, input.ids));
+      return { deleted: affectedRows(result) };
     }),
 });

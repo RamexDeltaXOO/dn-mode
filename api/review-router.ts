@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, inArray } from "drizzle-orm";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
+import { affectedRows, bulkIdsInput } from "./lib/bulk";
 import { reviews } from "@db/schema";
 
 const reviewInput = z.object({
@@ -50,5 +51,13 @@ export const reviewRouter = createRouter({
       const db = getDb();
       await db.delete(reviews).where(eq(reviews.id, input.id));
       return { success: true };
+    }),
+
+  deleteMany: adminQuery
+    .input(bulkIdsInput)
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const result = await db.delete(reviews).where(inArray(reviews.id, input.ids));
+      return { deleted: affectedRows(result) };
     }),
 });

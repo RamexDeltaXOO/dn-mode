@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/providers/trpc";
+import { useBulkSelection } from "@/hooks/useBulkSelection";
+import { BulkActionBar, SelectAllCell, SelectCell } from "@/components/admin/BulkSelection";
 import { Pencil, Trash2, Plus, X, Truck, RefreshCw, MapPin, AlertTriangle } from "lucide-react";
 import { CARRIER_LIST } from "@contracts/constants";
 import { type RateTier, hasWeightRange, readMethodConfig } from "@contracts/shipping-rates";
@@ -65,6 +67,8 @@ export default function AdminShipping() {
   const create = trpc.shipping.create.useMutation({ onSuccess: () => { refresh(); setShowForm(false); setForm(emptyForm); } });
   const update = trpc.shipping.update.useMutation({ onSuccess: () => { refresh(); setShowForm(false); setEditingId(null); } });
   const del = trpc.shipping.delete.useMutation({ onSuccess: refresh });
+  const selection = useBulkSelection(methods?.map((m) => m.id) ?? []);
+  const delMany = trpc.shipping.deleteMany.useMutation({ onSuccess: () => { refresh(); selection.clear(); } });
 
   // Lignes creees par l'ancienne synchronisation : une par tranche de poids.
   const legacyCount = methods?.filter((m) => m.sendcloudMethodId !== null && hasWeightRange(m.name)).length ?? 0;
@@ -308,6 +312,7 @@ export default function AdminShipping() {
       <div className="bg-white shadow-sm border border-[#e8e8e8] overflow-x-auto">
         <table className="w-full text-left">
           <thead><tr className="border-b border-[#f0f0f0]">
+            <SelectAllCell selection={selection} />
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Nom</th>
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Transporteur</th>
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Prix</th>
@@ -317,13 +322,14 @@ export default function AdminShipping() {
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Actions</th>
           </tr></thead>
           <tbody>
-            {isLoading ? <tr><td colSpan={7} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Chargement...</td></tr> :
-            !methods?.length ? <tr><td colSpan={7} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Aucune methode</td></tr> :
+            {isLoading ? <tr><td colSpan={8} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Chargement...</td></tr> :
+            !methods?.length ? <tr><td colSpan={8} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Aucune methode</td></tr> :
             methods.map(m => {
               const { rates } = readMethodConfig(m.config);
               const service = serviceFor(m.id);
               return (
-              <tr key={m.id} className="border-b border-[#f8f8f8] hover:bg-[#fafafa]">
+              <tr key={m.id} className={`border-b border-[#f8f8f8] hover:bg-[#fafafa] ${selection.isSelected(m.id) ? "bg-[#f6f6f6]" : ""}`}>
+                <SelectCell selection={selection} id={m.id} />
                 <td className="px-4 py-3 text-[0.8125rem]">
                   {m.name}
                   {m.requiresServicePoint && (
@@ -373,6 +379,7 @@ export default function AdminShipping() {
           </tbody>
         </table>
       </div>
+      <BulkActionBar selection={selection} noun="methode(s)" onDelete={(ids) => delMany.mutate({ ids })} pending={delMany.isPending} />
     </div>
   );
 }

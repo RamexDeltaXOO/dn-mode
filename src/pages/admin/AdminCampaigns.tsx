@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/providers/trpc";
+import { useBulkSelection } from "@/hooks/useBulkSelection";
+import { BulkActionBar, SelectAllCell, SelectCell } from "@/components/admin/BulkSelection";
 import { Trash2, Plus, Eye, Send, X, Check } from "lucide-react";
 
 const campaignTypes = [
@@ -75,6 +77,8 @@ export default function AdminCampaigns() {
   const { data: campaignList, isLoading } = trpc.campaign.list.useQuery();
   const create = trpc.campaign.create.useMutation({ onSuccess: () => { utils.campaign.list.invalidate(); setShowForm(false); } });
   const del = trpc.campaign.delete.useMutation({ onSuccess: () => utils.campaign.list.invalidate() });
+  const selection = useBulkSelection(campaignList?.map((c) => c.id) ?? []);
+  const delMany = trpc.campaign.deleteMany.useMutation({ onSuccess: () => { utils.campaign.list.invalidate(); selection.clear(); } });
   const sendNow = trpc.campaign.sendNow.useMutation({
     onSuccess: (data) => { setSentMsg(`${data.recipientCount} emails envoyes !`); setTimeout(() => setSentMsg(""), 3000); utils.campaign.list.invalidate(); },
   });
@@ -199,6 +203,7 @@ export default function AdminCampaigns() {
       <div className="bg-white shadow-sm border border-[#e8e8e8] overflow-x-auto">
         <table className="w-full text-left">
           <thead><tr className="border-b border-[#f0f0f0]">
+            <SelectAllCell selection={selection} />
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Nom</th>
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Type</th>
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Statut</th>
@@ -206,10 +211,11 @@ export default function AdminCampaigns() {
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Actions</th>
           </tr></thead>
           <tbody>
-            {isLoading ? <tr><td colSpan={5} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Chargement...</td></tr> :
-            !campaignList?.length ? <tr><td colSpan={5} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Aucune campagne</td></tr> :
+            {isLoading ? <tr><td colSpan={6} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Chargement...</td></tr> :
+            !campaignList?.length ? <tr><td colSpan={6} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Aucune campagne</td></tr> :
             campaignList.map(c => (
-              <tr key={c.id} className="border-b border-[#f8f8f8] hover:bg-[#fafafa]">
+              <tr key={c.id} className={`border-b border-[#f8f8f8] hover:bg-[#fafafa] ${selection.isSelected(c.id) ? "bg-[#f6f6f6]" : ""}`}>
+                <SelectCell selection={selection} id={c.id} />
                 <td className="px-4 py-3 text-[0.8125rem]">{c.name}</td>
                 <td className="px-4 py-3 text-[0.75rem] uppercase">{c.type}</td>
                 <td className="px-4 py-3">
@@ -235,6 +241,7 @@ export default function AdminCampaigns() {
           </tbody>
         </table>
       </div>
+      <BulkActionBar selection={selection} noun="campagne(s)" onDelete={(ids) => delMany.mutate({ ids })} pending={delMany.isPending} />
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import { Fragment, useState } from "react";
 import { trpc } from "@/providers/trpc";
+import { useBulkSelection } from "@/hooks/useBulkSelection";
+import { BulkActionBar, SelectAllCell, SelectCell } from "@/components/admin/BulkSelection";
 import { ChevronDown, Package, MapPin, ExternalLink, FileDown, Trash2 } from "lucide-react";
 import { carrierLabel } from "@contracts/constants";
 
@@ -59,6 +61,18 @@ export default function AdminOrders() {
 
   const orders = ordersData?.orders || [];
 
+  // "Tout selectionner" porte sur les commandes du filtre de statut affiche.
+  const selection = useBulkSelection(orders.map((o) => o.id));
+  const deleteOrders = trpc.order.deleteMany.useMutation({
+    onSuccess: (data, { ids }) => {
+      utils.order.list.invalidate();
+      selection.clear();
+      if (expandedOrder !== null && ids.includes(expandedOrder)) setExpandedOrder(null);
+      setFeedback(`${data.deleted} commande(s) supprimee(s).`);
+      setTimeout(() => setFeedback(""), 4000);
+    },
+  });
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -85,6 +99,7 @@ export default function AdminOrders() {
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-[#f0f0f0]">
+              <SelectAllCell selection={selection} />
               <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">#</th>
               <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Client</th>
               <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Date</th>
@@ -97,19 +112,20 @@ export default function AdminOrders() {
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Chargement...</td>
+                <td colSpan={8} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Chargement...</td>
               </tr>
             ) : orders.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Aucune commande</td>
+                <td colSpan={8} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Aucune commande</td>
               </tr>
             ) : (
               orders.map((order) => (
                 <Fragment key={order.id}>
                   <tr
-                    className="border-b border-[#f8f8f8] hover:bg-[#fafafa] cursor-pointer"
+                    className={`border-b border-[#f8f8f8] hover:bg-[#fafafa] cursor-pointer ${selection.isSelected(order.id) ? "bg-[#f6f6f6]" : ""}`}
                     onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
                   >
+                    <SelectCell selection={selection} id={order.id} />
                     <td className="px-4 py-3 text-[0.8125rem] font-medium">{order.orderNumber}</td>
                     <td className="px-4 py-3 text-[0.8125rem] text-[#666666]">
                       {order.firstName} {order.lastName || order.email}
@@ -163,7 +179,7 @@ export default function AdminOrders() {
                   </tr>
                   {expandedOrder === order.id && orderDetail && (
                     <tr>
-                      <td colSpan={7} className="px-4 py-4 bg-[#fafafa]">
+                      <td colSpan={8} className="px-4 py-4 bg-[#fafafa]">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
                             <h4 className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] mb-2">Articles</h4>
@@ -272,6 +288,13 @@ export default function AdminOrders() {
           </tbody>
         </table>
       </div>
+      <BulkActionBar
+        selection={selection}
+        noun="commande(s)"
+        onDelete={(ids) => deleteOrders.mutate({ ids })}
+        pending={deleteOrders.isPending}
+        confirmMessage={`Supprimer definitivement ${selection.selectedIds.length} commande(s) ?\n\nLes articles et les paiements associes seront egalement supprimes. Cette action est irreversible.`}
+      />
     </div>
   );
 }

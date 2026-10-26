@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/providers/trpc";
+import { useBulkSelection } from "@/hooks/useBulkSelection";
+import { BulkActionBar, SelectAllCell, SelectCell } from "@/components/admin/BulkSelection";
 import { Pencil, Trash2, Plus, X } from "lucide-react";
 import { slugify } from "@contracts/constants";
 
@@ -23,6 +25,8 @@ export default function AdminCollections() {
   const create = trpc.collection.create.useMutation({ onSuccess: () => { utils.collection.list.invalidate(); setShowForm(false); setForm(emptyForm); } });
   const update = trpc.collection.update.useMutation({ onSuccess: () => { utils.collection.list.invalidate(); setShowForm(false); setEditingId(null); setForm(emptyForm); } });
   const del = trpc.collection.delete.useMutation({ onSuccess: () => utils.collection.list.invalidate() });
+  const selection = useBulkSelection(collections?.map((c) => c.id) ?? []);
+  const delMany = trpc.collection.deleteMany.useMutation({ onSuccess: () => { utils.collection.list.invalidate(); selection.clear(); } });
 
   const openCreate = () => { setEditingId(null); setForm(emptyForm); setShowForm(true); };
   const openEdit = (c: any) => { setEditingId(c.id); setForm({ name: c.name, slug: c.slug, description: c.description || "", image: c.image || "", sortOrder: String(c.sortOrder || 0) }); setShowForm(true); };
@@ -67,16 +71,18 @@ export default function AdminCollections() {
       <div className="bg-white shadow-sm border border-[#e8e8e8] overflow-x-auto">
         <table className="w-full text-left">
           <thead><tr className="border-b border-[#f0f0f0]">
+            <SelectAllCell selection={selection} />
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Nom</th>
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Slug</th>
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Ordre</th>
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Actions</th>
           </tr></thead>
           <tbody>
-            {isLoading ? <tr><td colSpan={4} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Chargement...</td></tr> :
-            !collections?.length ? <tr><td colSpan={4} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Aucune collection</td></tr> :
+            {isLoading ? <tr><td colSpan={5} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Chargement...</td></tr> :
+            !collections?.length ? <tr><td colSpan={5} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Aucune collection</td></tr> :
             collections.map(c => (
-              <tr key={c.id} className="border-b border-[#f8f8f8] hover:bg-[#fafafa]">
+              <tr key={c.id} className={`border-b border-[#f8f8f8] hover:bg-[#fafafa] ${selection.isSelected(c.id) ? "bg-[#f6f6f6]" : ""}`}>
+                <SelectCell selection={selection} id={c.id} />
                 <td className="px-4 py-3 text-[0.8125rem]">{c.name}</td>
                 <td className="px-4 py-3 text-[0.8125rem] text-[#666666]">{c.slug}</td>
                 <td className="px-4 py-3 text-[0.8125rem]">{c.sortOrder}</td>
@@ -89,6 +95,7 @@ export default function AdminCollections() {
           </tbody>
         </table>
       </div>
+      <BulkActionBar selection={selection} noun="collection(s)" onDelete={(ids) => delMany.mutate({ ids })} pending={delMany.isPending} />
     </div>
   );
 }

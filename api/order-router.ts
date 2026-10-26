@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, inArray } from "drizzle-orm";
 import { createRouter, publicQuery, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
+import { affectedRows, bulkIdsInput } from "./lib/bulk";
 import { orders, orderItems, products, carts, cartItems, payments } from "@db/schema";
 import type { Order } from "@db/schema";
 import { ConfigKeys, EmailTemplateKeys, carrierLabel } from "@contracts/constants";
@@ -328,6 +329,18 @@ export const orderRouter = createRouter({
       await db.delete(orders).where(eq(orders.id, input.id));
 
       return { success: true, orderNumber: order.orderNumber };
+    }),
+
+  deleteMany: adminQuery
+    .input(bulkIdsInput)
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      // Memes regles que la suppression unitaire : articles et paiements
+      // partent avec la commande.
+      await db.delete(orderItems).where(inArray(orderItems.orderId, input.ids));
+      await db.delete(payments).where(inArray(payments.orderId, input.ids));
+      const result = await db.delete(orders).where(inArray(orders.id, input.ids));
+      return { deleted: affectedRows(result) };
     }),
 
   updateStatus: adminQuery

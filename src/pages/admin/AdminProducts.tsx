@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/providers/trpc";
+import { useBulkSelection } from "@/hooks/useBulkSelection";
+import { BulkActionBar, SelectAllCell, SelectCell } from "@/components/admin/BulkSelection";
 import { Pencil, Trash2, Plus, Search, X } from "lucide-react";
 import ImageUploader from "@/components/admin/ImageUploader";
 import { slugify, variantKey, variantKeys } from "@contracts/constants";
@@ -78,6 +80,15 @@ export default function AdminProducts() {
   const filtered = search
     ? products.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
     : products;
+
+  // "Tout selectionner" porte sur les resultats de la recherche.
+  const selection = useBulkSelection(filtered.map((p) => p.id));
+  const deleteProducts = trpc.product.deleteMany.useMutation({
+    onSuccess: () => {
+      utils.product.list.invalidate();
+      selection.clear();
+    },
+  });
 
   const openCreate = () => {
     createProduct.reset();
@@ -420,6 +431,7 @@ export default function AdminProducts() {
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-[#f0f0f0]">
+              <SelectAllCell selection={selection} />
               <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Image</th>
               <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Nom</th>
               <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Prix</th>
@@ -431,15 +443,19 @@ export default function AdminProducts() {
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Chargement...</td>
+                <td colSpan={7} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Chargement...</td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Aucun produit</td>
+                <td colSpan={7} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Aucun produit</td>
               </tr>
             ) : (
               filtered.map((product) => (
-                <tr key={product.id} className="border-b border-[#f8f8f8] hover:bg-[#fafafa]">
+                <tr
+                  key={product.id}
+                  className={`border-b border-[#f8f8f8] hover:bg-[#fafafa] ${selection.isSelected(product.id) ? "bg-[#f6f6f6]" : ""}`}
+                >
+                  <SelectCell selection={selection} id={product.id} />
                   <td className="px-4 py-3">
                     <div className="w-10 h-12 bg-[#f4f4f4] overflow-hidden">
                       <img
@@ -483,6 +499,12 @@ export default function AdminProducts() {
           </tbody>
         </table>
       </div>
+      <BulkActionBar
+        selection={selection}
+        noun="produit(s)"
+        onDelete={(ids) => deleteProducts.mutate({ ids })}
+        pending={deleteProducts.isPending}
+      />
     </div>
   );
 }

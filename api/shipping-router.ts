@@ -1,9 +1,10 @@
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { shippingMethods } from "@db/schema";
 import { priceForWeight, readMethodConfig, writeMethodConfig } from "@contracts/shipping-rates";
+import { affectedRows, bulkIdsInput } from "./lib/bulk";
 import { getShippingSettings, quoteShipping } from "./lib/shipping";
 import { gramsToKg, methodAcceptsWeight } from "./lib/weight";
 
@@ -143,6 +144,14 @@ export const shippingRouter = createRouter({
       const db = getDb();
       await db.delete(shippingMethods).where(eq(shippingMethods.id, input.id));
       return { success: true };
+    }),
+
+  deleteMany: adminQuery
+    .input(bulkIdsInput)
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const result = await db.delete(shippingMethods).where(inArray(shippingMethods.id, input.ids));
+      return { deleted: affectedRows(result) };
     }),
 });
 

@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/providers/trpc";
+import { useBulkSelection } from "@/hooks/useBulkSelection";
+import { BulkActionBar, SelectAllCell, SelectCell } from "@/components/admin/BulkSelection";
 import { Pencil, Trash2, Plus, X, Star } from "lucide-react";
 
 interface ReviewForm {
@@ -35,6 +37,8 @@ export default function AdminReviews() {
   const create = trpc.review.create.useMutation({ onSuccess: () => { refresh(); close(); } });
   const update = trpc.review.update.useMutation({ onSuccess: () => { refresh(); close(); } });
   const del = trpc.review.delete.useMutation({ onSuccess: refresh });
+  const selection = useBulkSelection(reviews?.map((r) => r.id) ?? []);
+  const delMany = trpc.review.deleteMany.useMutation({ onSuccess: () => { refresh(); selection.clear(); } });
   const toggle = trpc.review.update.useMutation({ onSuccess: refresh });
 
   const openCreate = () => {
@@ -184,6 +188,7 @@ export default function AdminReviews() {
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-[#f0f0f0]">
+              <SelectAllCell selection={selection} />
               {["Nom", "Avis", "Note", "Ordre", "Statut", "Actions"].map((h) => (
                 <th key={h} className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">{h}</th>
               ))}
@@ -191,12 +196,13 @@ export default function AdminReviews() {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Chargement...</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Chargement...</td></tr>
             ) : !reviews?.length ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Aucun avis</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Aucun avis</td></tr>
             ) : (
               reviews.map((r) => (
-                <tr key={r.id} className="border-b border-[#f8f8f8] hover:bg-[#fafafa] align-top">
+                <tr key={r.id} className={`border-b border-[#f8f8f8] hover:bg-[#fafafa] align-top ${selection.isSelected(r.id) ? "bg-[#f6f6f6]" : ""}`}>
+                  <SelectCell selection={selection} id={r.id} />
                   <td className="px-4 py-3 text-[0.8125rem] whitespace-nowrap">
                     {r.authorName}
                     {r.subtitle && <span className="block text-[0.6875rem] text-[#999999]">{r.subtitle}</span>}
@@ -232,6 +238,7 @@ export default function AdminReviews() {
           </tbody>
         </table>
       </div>
+      <BulkActionBar selection={selection} noun="avis" onDelete={(ids) => delMany.mutate({ ids })} pending={delMany.isPending} />
     </div>
   );
 }
