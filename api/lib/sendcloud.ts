@@ -440,25 +440,103 @@ export async function quoteShippingOption(code: string, weightKg: number): Promi
   return option ? quotePrice(option) : null;
 }
 
-/**
- * Adresse d'expedition : celle saisie dans le CRM, sinon la premiere adresse
- * francaise du compte Sendcloud. L'API v3 l'exige, la v2 prenait d'office
- * l'adresse par defaut du compte.
- */
-export async function resolveSenderAddressId(): Promise<{ id: number | null; error?: string }> {
-  const creds = await getSendcloudCredentials();
-  const configured = Number.parseInt(creds.senderAddressId, 10);
-  if (Number.isFinite(configured) && configured > 0) return { id: configured };
+// ── Expediteur ──────────────────────────────────────────────
+export type RawSenderAddress = {
+  id?: unknown;
+  name?: unknown;
+  company_name?: unknown;
+  address_line_1?: unknown;
+  address_line_2?: unknown;
+  house_number?: unknown;
+  postal_code?: unknown;
+  city?: unknown;
+  country_code?: unknown;
+  email?: unknown;
+  phone_number?: unknown;
+};
 
-  const result = await sendcloudRequest<{ data?: Array<{ id?: unknown; country_code?: unknown }> }>(
-    "/addresses/sender-addresses",
-    { base: V3_API, creds },
-  );
-  if (!result.ok) return { id: null, error: result.error };
+/** Expediteur d'une annonce : l'adresse complete, ou sa reference Sendcloud. */
+export type Sender = { fromAddress: Record<string, unknown>; brandId: number | null };
+
+function text(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * Adresse d'expedition au nom de la boutique seule. Une adresse Sendcloud
+ * porte un contact ("Nawel Benhaj") et une entreprise ("DN MODE"), et les
+ * deux s'impriment sur l'etiquette : on l'envoie complete, avec l'entreprise
+ * comme nom. Null sans nom d'entreprise ou s'il manque un champ obligatoire.
+ */
+export function senderAsCompany(address: RawSenderAddress): Record<string, unknown> | null {
+  const fields = {
+    name: text(address.company_name),
+    address_line_1: text(address.address_line_1),
+    postal_code: text(address.postal_code),
+    city: text(address.city),
+    country_code: text(address.country_code).toUpperCase(),
+  };
+  if (Object.values(fields).some((value) => value === "")) return null;
+  const optional: Record<string, string> = {
+    house_number: text(address.house_number),
+    address_line_2: text(address.address_line_2),
+    email: text(address.email),
+    phone_number: text(address.phone_number),
+  };
+  return {
+    ...fields,
+    ...Object.fromEntries(Object.entries(optional).filter(([, value]) => value !== "")),
+  };
+}
+
+/**
+ * Marque Sendcloud (logo des emails de suivi). Envoyee avec une adresse
+ * complete, l'annonce n'applique plus celle de l'adresse d'expedition : on la
+ * retrouve par son nom, ou on prend la seule marque du compte.
+ */
+async function findBrandId(name: string, creds: SendcloudCredentials): Promise<number | null> {
+  const result = await sendcloudRequest<{ data?: Array<{ id?: unknown; name?: unknown }> }>("/brands", {
+    base: V3_API,
+    creds,
+  });
+  if (!result.ok) return null;
+  const brands = Array.isArray(result.data?.data) ? result.data.data : [];
+  const match =
+    brands.find((b) => text(b?.name).toLowerCase() === name.toLowerCase()) ??
+    (brands.length === 1 ? brands[0] : undefined);
+  return toNumber(match?.id);
+}
+
+/**
+ * Expediteur de l'etiquette : l'adresse saisie dans le CRM (par son ID),
+ * sinon la premiere adresse francaise du compte Sendcloud. L'API v3 l'exige,
+ * la v2 prenait d'office l'adresse par defaut du compte.
+ */
+export async function resolveSender(): Promise<{ sender: Sender | null; error?: string }> {
+  const creds = await getSendcloudCredentials();
+  const parsed = Number.parseInt(creds.senderAddressId, 10);
+  const configured = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  const byId = (id: number): Sender => ({ fromAddress: { sender_address_id: id }, brandId: null });
+
+  const result = await sendcloudRequest<{ data?: RawSenderAddress[] }>("/addresses/sender-addresses", {
+    base: V3_API,
+    creds,
+  });
+  if (!result.ok) {
+    // Liste illisible : l'ID saisi suffit encore a creer l'etiquette.
+    return configured ? { sender: byId(configured) } : { sender: null, error: result.error };
+  }
+
   const addresses = Array.isArray(result.data?.data) ? result.data.data : [];
-  const chosen =
-    addresses.find((a) => String(a?.country_code ?? "").toUpperCase() === "FR") ?? addresses[0];
-  return { id: toNumber(chosen?.id) };
+  const chosen = configured
+    ? addresses.find((a) => toNumber(a?.id) === configured)
+    : (addresses.find((a) => text(a?.country_code).toUpperCase() === "FR") ?? addresses[0]);
+  const id = configured ?? toNumber(chosen?.id);
+  if (!id) return { sender: null };
+
+  const company = chosen ? senderAsCompany(chosen) : null;
+  if (!company) return { sender: byId(id) };
+  return { sender: { fromAddress: company, brandId: await findBrandId(String(company.name), creds) } };
 }
 
 // ── Points relais ───────────────────────────────────────────
@@ -569,7 +647,7 @@ export type ShipmentInput = {
   /** Code de l'option Sendcloud ("mondial_relay:standard"). */
   shippingOptionCode: string;
   servicePointId?: string | null;
-  senderAddressId: number;
+  sender: Sender;
 };
 
 /** La boutique livre la France : le pays est stocke en toutes lettres ("France"). */
@@ -594,7 +672,7 @@ export function buildShipmentBody(input: ShipmentInput): Record<string, unknown>
   if (input.telephone) toAddress.phone_number = input.telephone;
 
   const body: Record<string, unknown> = {
-    from_address: { sender_address_id: input.senderAddressId },
+    from_address: input.sender.fromAddress,
     to_address: toAddress,
     ship_with: {
       type: "shipping_option_code",
@@ -604,6 +682,7 @@ export function buildShipmentBody(input: ShipmentInput): Record<string, unknown>
     parcels: [{ weight: { value: input.weight.toFixed(3), unit: "kg" } }],
   };
   if (input.servicePointId) body.to_service_point = { id: String(input.servicePointId) };
+  if (input.sender.brandId) body.brand_id = input.sender.brandId;
   return body;
 }
 

@@ -46,6 +46,12 @@ ouverte.
 Sans ID d'adresse d'expedition, l'etiquette part de la premiere adresse
 francaise du compte Sendcloud (Sendcloud > Parametres > Adresses).
 
+L'expediteur imprime sur l'etiquette est le **nom d'entreprise** de cette
+adresse (« DN MODE »), sans le nom du contact : l'adresse est envoyee complete
+avec l'entreprise comme nom. La marque Sendcloud (logo des emails de suivi)
+est conservee : celle qui porte le meme nom, ou la seule marque du compte.
+Sans nom d'entreprise, l'adresse est envoyee telle quelle.
+
 1. Renseigner les cles, puis **Tester la connexion**.
 2. Aller dans **Admin > Livraison** et cliquer **Synchroniser depuis Sendcloud** :
    chaque offre du CRM est reliee a l'option Sendcloud correspondante (meme

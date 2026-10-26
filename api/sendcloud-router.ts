@@ -23,7 +23,7 @@ import {
   listShippingOptions,
   parcelFailure,
   quoteShippingOption,
-  resolveSenderAddressId,
+  resolveSender,
   searchServicePoints,
 } from "./lib/sendcloud";
 
@@ -287,11 +287,11 @@ export const sendcloudRouter = createRouter({
         );
       }
 
-      const sender = await resolveSenderAddressId();
-      if (!sender.id) {
+      const { sender, error: senderError } = await resolveSender();
+      if (!sender) {
         return parcelFailure(
           `Aucune adresse d'expedition trouvee sur votre compte Sendcloud${
-            sender.error ? ` (${sender.error})` : ""
+            senderError ? ` (${senderError})` : ""
           }. Ajoutez-en une dans Sendcloud ou renseignez son ID dans Parametres.`,
         );
       }
@@ -308,7 +308,7 @@ export const sendcloudRouter = createRouter({
         weight: weightKg,
         shippingOptionCode: service.code,
         servicePointId: order.servicePointId,
-        senderAddressId: sender.id,
+        sender,
       });
 
       if (result.ok) {

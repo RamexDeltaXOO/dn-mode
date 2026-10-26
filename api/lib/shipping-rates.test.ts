@@ -15,6 +15,7 @@ import {
   buildShipmentBody,
   mapShippingOption,
   readShipmentResult,
+  senderAsCompany,
   sendcloudErrorMessage,
   shippingOptionsBody,
 } from "./sendcloud";
@@ -125,7 +126,7 @@ describe("annonce d'un colis (API v3)", () => {
     weight: 0.6,
     shippingOptionCode: "mondial_relay:standard",
     servicePointId: "12345",
-    senderAddressId: 42,
+    sender: { fromAddress: { sender_address_id: 42 }, brandId: null },
   };
 
   it("envoie l'adresse, le point relais, l'option et le poids", () => {
@@ -149,6 +150,43 @@ describe("annonce d'un colis (API v3)", () => {
     const home = buildShipmentBody({ ...input, servicePointId: null, telephone: "" });
     expect(home.to_service_point).toBeUndefined();
     expect((home.to_address as Record<string, string>).phone_number).toBeUndefined();
+    expect(home.brand_id).toBeUndefined();
+  });
+
+  it("imprime la boutique seule comme expediteur, en gardant sa marque", () => {
+    // Adresse d'expedition telle que Sendcloud la renvoie (GET /addresses/sender-addresses).
+    const address = {
+      id: 77,
+      name: "Nawel Benhaj",
+      company_name: "DN MODE",
+      address_line_1: "Place Gaston Dourdin",
+      house_number: "3",
+      address_line_2: "",
+      postal_code: "93200",
+      city: "Saint-Denis",
+      country_code: "FR",
+      email: "contact@dnmode.fr",
+      phone_number: "",
+    };
+    const fromAddress = senderAsCompany(address)!;
+    expect(fromAddress).toEqual({
+      name: "DN MODE",
+      address_line_1: "Place Gaston Dourdin",
+      house_number: "3",
+      postal_code: "93200",
+      city: "Saint-Denis",
+      country_code: "FR",
+      email: "contact@dnmode.fr",
+    });
+    expect(fromAddress.company_name).toBeUndefined();
+
+    const body = buildShipmentBody({ ...input, sender: { fromAddress, brandId: 5 } });
+    expect(body.from_address).toBe(fromAddress);
+    expect(body.brand_id).toBe(5);
+
+    // Sans nom d'entreprise : l'adresse reste referencee par son ID.
+    expect(senderAsCompany({ ...address, company_name: " " })).toBeNull();
+    expect(senderAsCompany({ ...address, city: "" })).toBeNull();
   });
 
   it("filtre les options par destination, point relais et poids", () => {
