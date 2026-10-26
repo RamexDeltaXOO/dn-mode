@@ -3,14 +3,18 @@ import { eq } from "drizzle-orm";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { shippingMethods } from "@db/schema";
+import { priceForWeight, readMethodConfig, writeMethodConfig } from "@contracts/shipping-rates";
 import { getShippingSettings, quoteShipping } from "./lib/shipping";
 import { gramsToKg, methodAcceptsWeight } from "./lib/weight";
 
+const ratesInput = z
+  .array(z.object({ upToKg: z.number().positive(), price: z.number().min(0) }))
+  .max(50);
+
 export const shippingRouter = createRouter({
   /**
-   * Methodes actives. Avec un poids fourni, on ne renvoie que les methodes
-   * dont la tranche couvre ce poids : c'est ce decoupage qui porte le tarif
-   * chez Sendcloud.
+   * Offres actives, avec le prix calcule pour le poids du colis. Une offre
+   * n'est masquee que si le colis depasse ce que son transporteur accepte.
    */
   list: publicQuery
     .input(z.object({ weightGrams: z.number().min(0).optional() }).optional())
@@ -23,13 +27,22 @@ export const shippingRouter = createRouter({
         .orderBy(shippingMethods.sortOrder);
 
       const grams = input?.weightGrams ?? 0;
-      if (grams <= 0) return methods;
-
-      const weightKg = gramsToKg(grams);
-      const applicable = methods.filter((m) => methodAcceptsWeight(m, weightKg));
+      const weightKg = grams > 0 ? gramsToKg(grams) : null;
+      const applicable =
+        weightKg === null ? methods : methods.filter((m) => methodAcceptsWeight(m, weightKg));
       // Ne jamais renvoyer une liste vide : mieux vaut proposer un tarif
       // approximatif que bloquer le tunnel de commande.
-      return applicable.length > 0 ? applicable : methods;
+      const visible = applicable.length > 0 ? applicable : methods;
+
+      const { defaultCost } = await getShippingSettings();
+      return visible.map((m) => ({
+        id: m.id,
+        name: m.name,
+        carrier: m.carrier,
+        price: priceForWeight(m, weightKg, defaultCost).toFixed(2),
+        estimatedDays: m.estimatedDays,
+        requiresServicePoint: m.requiresServicePoint,
+      }));
     }),
 
   listAll: adminQuery.query(async () => {
@@ -67,15 +80,21 @@ export const shippingRouter = createRouter({
       sortOrder: z.number().optional(),
       sendcloudMethodId: z.number().optional(),
       requiresServicePoint: z.boolean().optional(),
+      rates: ratesInput.optional(),
+      sendcloudService: z.string().nullable().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = getDb();
+      const config = writeMethodConfig(input.config ? JSON.parse(input.config) : null, {
+        rates: input.rates,
+        sendcloudService: input.sendcloudService,
+      });
       const result = await db.insert(shippingMethods).values({
         name: input.name,
         carrier: input.carrier,
-        price: String(input.price),
+        price: String(firstRatePrice(config) ?? input.price),
         estimatedDays: input.estimatedDays || null,
-        config: input.config ? JSON.parse(input.config) : null,
+        config,
         sortOrder: input.sortOrder || 0,
         sendcloudMethodId: input.sendcloudMethodId ?? null,
         requiresServicePoint: input.requiresServicePoint ?? false,
@@ -95,13 +114,25 @@ export const shippingRouter = createRouter({
       sortOrder: z.number().optional(),
       sendcloudMethodId: z.number().optional(),
       requiresServicePoint: z.boolean().optional(),
+      rates: ratesInput.optional(),
+      sendcloudService: z.string().nullable().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = getDb();
-      const { id, config, price, ...rest } = input;
+      const { id, config, price, rates, sendcloudService, ...rest } = input;
       const data: Partial<typeof shippingMethods.$inferInsert> = { ...rest };
       if (price !== undefined) data.price = String(price);
       if (config !== undefined) data.config = JSON.parse(config);
+      if (rates !== undefined || sendcloudService !== undefined) {
+        const [current] = await db
+          .select({ config: shippingMethods.config })
+          .from(shippingMethods)
+          .where(eq(shippingMethods.id, id));
+        data.config = writeMethodConfig(data.config ?? current?.config, { rates, sendcloudService });
+        // Le prix unique suit la premiere tranche : c'est le "a partir de".
+        const first = firstRatePrice(data.config);
+        if (first !== null) data.price = String(first);
+      }
       await db.update(shippingMethods).set(data).where(eq(shippingMethods.id, id));
       return { success: true };
     }),
@@ -114,3 +145,7 @@ export const shippingRouter = createRouter({
       return { success: true };
     }),
 });
+
+function firstRatePrice(config: unknown): number | null {
+  return readMethodConfig(config).rates[0]?.price ?? null;
+}

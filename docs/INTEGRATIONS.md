@@ -39,14 +39,35 @@ Les gabarits d'emails peuvent aussi etre crees depuis le CRM :
 
 1. Renseigner les cles, puis **Tester la connexion**.
 2. Aller dans **Admin > Livraison** et cliquer **Synchroniser depuis Sendcloud** :
-   les methodes Colissimo / Chronopost / Mondial Relay livrables en France sont
-   importees dans `shipping_methods`.
-3. Les methodes marquees « Point relais » declenchent le selecteur de point
+   chaque offre du CRM est reliee au service Sendcloud correspondant (meme
+   transporteur, meme mode domicile / point relais). La colonne « Sendcloud »
+   indique le service retenu, ou « Aucun service » si le compte Sendcloud n'en
+   propose pas (les etiquettes seront alors refusees pour cette offre).
+   Sans aucune offre en base, la synchronisation en cree une par transporteur
+   et par mode.
+3. Les offres marquees « Point relais » declenchent le selecteur de point
    relais dans le tunnel de commande.
 4. Depuis **Admin > Commandes**, deplier une commande puis
    **Creer l'etiquette Sendcloud** : le colis est cree, le numero de suivi et
    l'etiquette PDF sont enregistres et la commande passe en « Expedie »
    (ce qui declenche l'email d'expedition).
+
+### Offres et tranches de poids
+
+Sendcloud decoupe chaque service en une methode par tranche de poids
+(« Colissimo Home 0.5-0.75kg », « Colissimo Home 0.75-1kg »...), sans prix
+client. Ces tranches ne sont **jamais** proposees au client : une ligne de
+**Admin > Livraison** est une offre (« Mondial Relay Point Relais »), et la
+tranche Sendcloud est choisie a la creation de l'etiquette d'apres le poids
+reel du colis.
+
+Le service est choisi automatiquement (le plus standard : sans signature, QR
+code ni consigne). On peut en imposer un autre dans la fiche de l'offre
+(« Service Sendcloud »), par exemple « Mondial Relay Point Relais QR ».
+
+Les anciennes versions importaient une ligne par tranche de poids, a 0 € :
+la synchronisation les supprime (le CRM affiche un avertissement tant qu'il en
+reste).
 
 Sans cles : methodes et points relais de demonstration, generation d'etiquette
 refusee avec un message explicite.
@@ -60,13 +81,17 @@ plus le poids d'emballage configure dans **Parametres > Livraison Sendcloud**
 
 Ce poids sert a deux choses :
 
-1. **Choisir la bonne tranche tarifaire.** Sendcloud decoupe souvent un meme
-   transporteur en plusieurs methodes par palier de poids, et c'est ce palier
-   qui porte le prix. Le tunnel de commande ne propose que les methodes dont
-   la tranche couvre le poids du panier ; si aucune ne convient, toutes sont
-   affichees plutot que de bloquer la commande.
-2. **Declarer le poids exact du colis** a la creation de l'etiquette, ce qui
-   evite les regularisations de facturation du transporteur.
+1. **Calculer le prix de livraison.** Chaque offre a une grille « Tarif selon
+   le poids du colis » (Admin > Livraison > modifier) : par exemple jusqu'a
+   0.5 kg : 4.50 €, jusqu'a 1 kg : 5.50 €, jusqu'a 2 kg : 6.90 €. Le prix
+   affiche au checkout et facture a la commande est celui de la tranche du
+   colis ; au-dela de la derniere tranche, son prix s'applique. Sans grille,
+   l'offre garde un prix unique. Si Sendcloud communique ses tarifs, le bouton
+   « Reprendre les tarifs Sendcloud » pre-remplit la grille. Une offre n'est
+   masquee que si le colis depasse le poids maximal de son service Sendcloud.
+2. **Choisir la tranche Sendcloud et declarer le poids exact du colis** a la
+   creation de l'etiquette, ce qui evite les regularisations de facturation du
+   transporteur.
 
 Le poids est fige sur la ligne de commande au moment de l'achat, comme le
 prix : modifier ou supprimer un produit ensuite ne change pas les commandes

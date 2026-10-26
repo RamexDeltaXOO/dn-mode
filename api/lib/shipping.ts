@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { ConfigKeys, Shipping, freeShippingBanner } from "@contracts/constants";
+import { priceForWeight } from "@contracts/shipping-rates";
 import { getConfigNumber } from "./site-config";
 import { getWeightSettings, gramsToKg, methodAcceptsWeight } from "./weight";
 import { getDb } from "../queries/connection";
@@ -56,7 +57,7 @@ export type ShippingQuote = {
  *
  * La livraison est offerte des que le sous-total atteint le seuil configure
  * (100€ par defaut, France metropolitaine). Sinon on applique le tarif de la
- * methode choisie, ou le tarif par defaut.
+ * methode choisie pour le poids du colis, ou le tarif par defaut.
  */
 export async function quoteShipping(input: {
   subtotal: number;
@@ -86,14 +87,13 @@ export async function quoteShipping(input: {
         .from(shippingMethods)
         .where(eq(shippingMethods.id, input.methodId));
       if (method && method.isActive) {
-        price = Number.parseFloat(String(method.price));
-        if (!Number.isFinite(price)) price = settings.defaultCost;
+        // Grille de l'offre : le prix suit le poids du colis.
+        price = priceForWeight(method, weightKg, settings.defaultCost);
         methodName = method.name;
         carrier = method.carrier;
         requiresServicePoint = Boolean(method.requiresServicePoint);
         methodId = method.id;
-        // Sendcloud decoupe les methodes par palier de poids : hors palier,
-        // le tarif affiche ne serait pas celui facture.
+        // Colis plus lourd que ce que le transporteur accepte.
         if (weightKg !== null && !methodAcceptsWeight(method, weightKg)) {
           weightOutOfRange = true;
         }

@@ -165,6 +165,11 @@ function toNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function positive(value: unknown): number | null {
+  const parsed = toNumber(value);
+  return parsed !== null && parsed > 0 ? parsed : null;
+}
+
 /** Normalise un nom de transporteur Sendcloud vers un code interne connu. */
 export function normalizeCarrier(raw: unknown): string {
   const value = String(raw ?? "")
@@ -306,7 +311,7 @@ export async function getAccount(): Promise<{
 }
 
 // ── Methodes d'expedition ───────────────────────────────────
-type RawShippingMethod = {
+export type RawShippingMethod = {
   id?: unknown;
   name?: unknown;
   carrier?: unknown;
@@ -317,7 +322,7 @@ type RawShippingMethod = {
   countries?: Array<{ iso_2?: unknown; price?: unknown }>;
 };
 
-function mapShippingMethod(raw: RawShippingMethod): SendcloudMethod | null {
+export function mapShippingMethod(raw: RawShippingMethod): SendcloudMethod | null {
   const id = toNumber(raw?.id);
   if (id === null) return null;
 
@@ -326,9 +331,10 @@ function mapShippingMethod(raw: RawShippingMethod): SendcloudMethod | null {
     .map((c) => String(c?.iso_2 ?? "").toUpperCase())
     .filter((code) => code !== "");
 
-  // Le prix peut etre absent au niveau racine : on prend celui de la France.
+  // Le prix racine vaut 0 sur la plupart des comptes : c'est le prix vers la
+  // France qui compte. Un 0 signifie "tarif non communique", jamais "gratuit".
   const frEntry = countryEntries.find((c) => String(c?.iso_2 ?? "").toUpperCase() === "FR");
-  const price = toNumber(raw.price) ?? toNumber(frEntry?.price);
+  const price = positive(frEntry?.price) ?? positive(raw.price);
 
   return {
     id,

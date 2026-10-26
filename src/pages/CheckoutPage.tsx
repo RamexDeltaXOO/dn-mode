@@ -257,7 +257,10 @@ function CheckoutFlow() {
     const items = cart?.items ?? [];
     if (!shippingSettings || items.length === 0) return 0;
     const content = items.reduce((total, item) => {
-      const unit = item.product?.weightGrams ?? shippingSettings.fallbackWeightGrams;
+      // Meme regle que le serveur (lineWeightGrams) : un poids nul ou absent
+      // prend la valeur de repli, sinon la tranche affichee differerait.
+      const declared = item.product?.weightGrams ?? 0;
+      const unit = declared > 0 ? declared : shippingSettings.fallbackWeightGrams;
       return total + unit * item.quantity;
     }, 0);
     return content > 0 ? content + shippingSettings.packagingWeightGrams : 0;

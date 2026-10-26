@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { trpc } from "@/providers/trpc";
-import { Pencil, Trash2, Plus, X, Truck, RefreshCw, MapPin } from "lucide-react";
+import { Pencil, Trash2, Plus, X, Truck, RefreshCw, MapPin, AlertTriangle } from "lucide-react";
 import { CARRIER_LIST } from "@contracts/constants";
+import { type RateTier, hasWeightRange, readMethodConfig } from "@contracts/shipping-rates";
+
+interface RateRow {
+  upToKg: string;
+  price: string;
+}
 
 interface FormData {
   name: string;
@@ -10,6 +16,9 @@ interface FormData {
   estimatedDays: string;
   sortOrder: string;
   requiresServicePoint: boolean;
+  /** Vide : service choisi automatiquement. */
+  sendcloudService: string;
+  rates: RateRow[];
 }
 
 const emptyForm: FormData = {
@@ -19,9 +28,25 @@ const emptyForm: FormData = {
   estimatedDays: "",
   sortOrder: "0",
   requiresServicePoint: false,
+  sendcloudService: "",
+  rates: [],
 };
 
 const carriers = CARRIER_LIST.map((c) => ({ value: c.code as string, label: c.label }));
+
+const toRows = (rates: RateTier[]): RateRow[] =>
+  rates.map((r) => ({ upToKg: String(r.upToKg), price: r.price.toFixed(2) }));
+
+/** Tranches saisies valides, triees par poids croissant. */
+function parseRows(rows: RateRow[]): RateTier[] {
+  return rows
+    .map((r) => ({
+      upToKg: Number.parseFloat(r.upToKg.replace(",", ".")),
+      price: Number.parseFloat(r.price.replace(",", ".")),
+    }))
+    .filter((r) => Number.isFinite(r.upToKg) && r.upToKg > 0 && Number.isFinite(r.price) && r.price >= 0)
+    .sort((a, b) => a.upToKg - b.upToKg);
+}
 
 export default function AdminShipping() {
   const utils = trpc.useUtils();
@@ -32,16 +57,29 @@ export default function AdminShipping() {
   const [form, setForm] = useState<FormData>(emptyForm);
 
   const { data: sendcloudStatus } = trpc.sendcloud.status.useQuery(undefined, { retry: false });
-  const syncMethods = trpc.sendcloud.syncMethods.useMutation({
-    onSuccess: () => utils.shipping.listAll.invalidate(),
-  });
+  // Services Sendcloud du compte et service retenu pour chaque offre.
+  const { data: sendcloud, isLoading: servicesLoading } = trpc.sendcloud.services.useQuery(undefined, { retry: false });
+  const refresh = () => { utils.shipping.listAll.invalidate(); utils.sendcloud.services.invalidate(); };
+  const syncMethods = trpc.sendcloud.syncMethods.useMutation({ onSuccess: refresh });
 
-  const create = trpc.shipping.create.useMutation({ onSuccess: () => { utils.shipping.listAll.invalidate(); setShowForm(false); setForm(emptyForm); } });
-  const update = trpc.shipping.update.useMutation({ onSuccess: () => { utils.shipping.listAll.invalidate(); setShowForm(false); setEditingId(null); } });
-  const del = trpc.shipping.delete.useMutation({ onSuccess: () => utils.shipping.listAll.invalidate() });
+  const create = trpc.shipping.create.useMutation({ onSuccess: () => { refresh(); setShowForm(false); setForm(emptyForm); } });
+  const update = trpc.shipping.update.useMutation({ onSuccess: () => { refresh(); setShowForm(false); setEditingId(null); } });
+  const del = trpc.shipping.delete.useMutation({ onSuccess: refresh });
+
+  // Lignes creees par l'ancienne synchronisation : une par tranche de poids.
+  const legacyCount = methods?.filter((m) => m.sendcloudMethodId !== null && hasWeightRange(m.name)).length ?? 0;
+  const serviceFor = (id: number) => sendcloud?.links.find((l) => l.methodId === id)?.service ?? null;
+
+  // Services possibles pour le transporteur et le mode saisis ; le premier
+  // est celui que le choix automatique retient.
+  const formServices = (sendcloud?.services ?? []).filter(
+    (s) => s.carrier === form.carrier && s.requiresServicePoint === form.requiresServicePoint,
+  );
+  const chosenService = formServices.find((s) => s.name === form.sendcloudService) ?? formServices[0] ?? null;
 
   const openCreate = () => { setEditingId(null); setForm(emptyForm); setShowForm(true); };
   const openEdit = (m: MethodRow) => {
+    const config = readMethodConfig(m.config);
     setEditingId(m.id);
     setForm({
       name: m.name,
@@ -50,19 +88,34 @@ export default function AdminShipping() {
       estimatedDays: m.estimatedDays || "",
       sortOrder: String(m.sortOrder || 0),
       requiresServicePoint: Boolean(m.requiresServicePoint),
+      sendcloudService: config.sendcloudService ?? "",
+      rates: toRows(config.rates),
     });
     setShowForm(true);
   };
 
+  const setRate = (index: number, patch: Partial<RateRow>) =>
+    setForm({ ...form, rates: form.rates.map((r, i) => (i === index ? { ...r, ...patch } : r)) });
+  const addRate = () => {
+    const last = parseRows(form.rates).at(-1);
+    const next = last
+      ? { upToKg: String(last.upToKg < 1 ? last.upToKg + 0.5 : last.upToKg + 1), price: last.price.toFixed(2) }
+      : { upToKg: "0.5", price: form.price };
+    setForm({ ...form, rates: [...form.rates, next] });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const rates = parseRows(form.rates);
     const data = {
       name: form.name,
       carrier: form.carrier,
-      price: form.price,
+      price: rates.length > 0 ? rates[0].price : form.price,
       estimatedDays: form.estimatedDays || undefined,
       sortOrder: parseInt(form.sortOrder) || 0,
       requiresServicePoint: form.requiresServicePoint,
+      rates,
+      sendcloudService: form.sendcloudService || null,
     };
     if (editingId) update.mutate({ id: editingId, ...data }); else create.mutate(data);
   };
@@ -98,8 +151,25 @@ export default function AdminShipping() {
         {syncMethods.data && (
           <p className="text-[0.75rem] text-[#666666] mb-2">{syncMethods.data.message}</p>
         )}
+        <p className="text-[0.6875rem] text-[#999999]">
+          Chaque ligne ci-dessous est un choix propose au client. Son prix suit le poids du colis
+          (grille de tarifs), et la tranche de poids Sendcloud est choisie automatiquement a la
+          creation de l&apos;etiquette.
+        </p>
+        {sendcloudStatus?.configured && sendcloud?.error && (
+          <p className="text-[0.75rem] text-red-600 mt-2">
+            Sendcloud injoignable ({sendcloud.error}) : les services affiches sont ceux de demonstration.
+          </p>
+        )}
+        {legacyCount > 0 && (
+          <p className="text-[0.75rem] text-[#9a6700] mt-2 flex items-start gap-1.5">
+            <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />
+            {legacyCount} tranche(s) de poids importee(s) par l&apos;ancienne synchronisation. Cliquez sur
+            « Synchroniser depuis Sendcloud » pour les regrouper.
+          </p>
+        )}
         {!sendcloudStatus?.configured && (
-          <p className="text-[0.6875rem] text-[#999999]">
+          <p className="text-[0.6875rem] text-[#999999] mt-2">
             Renseignez vos cles API dans Parametres &gt; Livraison Sendcloud pour activer les
             etiquettes et les vrais points relais.
           </p>
@@ -123,7 +193,7 @@ export default function AdminShipping() {
 
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-[300] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-[500px]">
+          <div className="bg-white w-full max-w-[500px] max-h-[90vh] overflow-y-auto">
             <div className="p-5 border-b border-[#f0f0f0] flex items-center justify-between">
               <h2 className="text-[0.875rem] font-medium">{editingId ? "Modifier" : "Ajouter"} une methode</h2>
               <button onClick={() => setShowForm(false)}><X size={18} /></button>
@@ -136,17 +206,19 @@ export default function AdminShipping() {
               </div>
               <div>
                 <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Transporteur *</label>
-                <select value={form.carrier} onChange={e => setForm({...form, carrier: e.target.value})}
+                <select value={form.carrier} onChange={e => setForm({...form, carrier: e.target.value, sendcloudService: ""})}
                   className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222] bg-white">
                   {carriers.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Prix (EUR) *</label>
-                  <input type="number" step="0.01" value={form.price} onChange={e => setForm({...form, price: e.target.value})} required
-                    className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222]" />
-                </div>
+                {form.rates.length === 0 && (
+                  <div>
+                    <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Prix unique (EUR) *</label>
+                    <input type="number" step="0.01" min="0" value={form.price} onChange={e => setForm({...form, price: e.target.value})} required
+                      className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222]" />
+                  </div>
+                )}
                 <div>
                   <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Delai estime</label>
                   <input value={form.estimatedDays} onChange={e => setForm({...form, estimatedDays: e.target.value})}
@@ -154,15 +226,77 @@ export default function AdminShipping() {
                     className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222]" />
                 </div>
               </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999]">Tarif selon le poids du colis</label>
+                  {chosenService && chosenService.suggestedRates.length > 0 && (
+                    <button type="button" onClick={() => setForm({ ...form, rates: toRows(chosenService.suggestedRates) })}
+                      className="text-[0.625rem] uppercase tracking-[1px] text-[#666666] underline">
+                      Reprendre les tarifs Sendcloud
+                    </button>
+                  )}
+                </div>
+                {form.rates.length === 0 ? (
+                  <p className="text-[0.75rem] text-[#999999] mb-2">Prix unique, quel que soit le poids du colis.</p>
+                ) : (
+                  <div className="space-y-2 mb-2">
+                    {form.rates.map((rate, index) => (
+                      <div key={index} className="flex items-center gap-2 text-[0.75rem] text-[#666666]">
+                        <span className="w-14">Jusqu&apos;a</span>
+                        <input type="number" step="0.01" min="0.01" value={rate.upToKg} required
+                          onChange={e => setRate(index, { upToKg: e.target.value })}
+                          className="w-20 border border-[#e0e0e0] px-2 py-1.5 text-[0.8125rem] text-[#222222] outline-none focus:border-[#222222]" />
+                        <span>kg</span>
+                        <input type="number" step="0.01" min="0" value={rate.price} required
+                          onChange={e => setRate(index, { price: e.target.value })}
+                          className="w-20 border border-[#e0e0e0] px-2 py-1.5 text-[0.8125rem] text-[#222222] outline-none focus:border-[#222222]" />
+                        <span>EUR</span>
+                        <button type="button" onClick={() => setForm({ ...form, rates: form.rates.filter((_, i) => i !== index) })}
+                          className="ml-auto p-1 hover:bg-red-50 text-red-600" title="Retirer la tranche"><X size={14} /></button>
+                      </div>
+                    ))}
+                    <p className="text-[0.6875rem] text-[#999999]">Au-dela de la derniere tranche, son prix s&apos;applique.</p>
+                  </div>
+                )}
+                <button type="button" onClick={addRate}
+                  className="flex items-center gap-1 border border-[#e0e0e0] px-2 py-1 text-[0.625rem] uppercase tracking-[1px] hover:border-[#222222]">
+                  <Plus size={11} /> Ajouter une tranche de poids
+                </button>
+              </div>
+
               <label className="flex items-center gap-2 text-[0.8125rem] text-[#666666] cursor-pointer">
                 <input
                   type="checkbox"
                   checked={form.requiresServicePoint}
-                  onChange={(e) => setForm({ ...form, requiresServicePoint: e.target.checked })}
+                  onChange={(e) => setForm({ ...form, requiresServicePoint: e.target.checked, sendcloudService: "" })}
                   className="w-4 h-4 accent-[#222222]"
                 />
                 Livraison en point relais (le client choisit un point au checkout)
               </label>
+
+              <div>
+                <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Service Sendcloud (etiquette)</label>
+                <select value={form.sendcloudService} onChange={e => setForm({...form, sendcloudService: e.target.value})}
+                  className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222] bg-white">
+                  <option value="">{formServices[0] ? `Automatique (${formServices[0].name})` : "Automatique"}</option>
+                  {formServices.map(s => (
+                    <option key={s.name} value={s.name}>
+                      {s.name}{s.maxWeight !== null ? ` · jusqu'a ${s.maxWeight} kg` : ""}
+                    </option>
+                  ))}
+                  {form.sendcloudService && !formServices.some(s => s.name === form.sendcloudService) && (
+                    <option value={form.sendcloudService}>{form.sendcloudService} (introuvable)</option>
+                  )}
+                </select>
+                {sendcloud && formServices.length === 0 && (
+                  <p className="text-[0.6875rem] text-red-600 mt-1">
+                    Aucun service {carriers.find((c) => c.value === form.carrier)?.label}{" "}
+                    {form.requiresServicePoint ? "en point relais" : "a domicile"} sur votre compte Sendcloud :
+                    les etiquettes ne pourront pas etre creees pour cette offre.
+                  </p>
+                )}
+              </div>
               <button type="submit" className="w-full bg-[#222222] text-white py-2.5 text-[0.75rem] uppercase tracking-[2px]">
                 {editingId ? "Mettre a jour" : "Creer"}
               </button>
@@ -178,13 +312,17 @@ export default function AdminShipping() {
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Transporteur</th>
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Prix</th>
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Delai</th>
+            <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Sendcloud</th>
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Statut</th>
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Actions</th>
           </tr></thead>
           <tbody>
-            {isLoading ? <tr><td colSpan={6} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Chargement...</td></tr> :
-            !methods?.length ? <tr><td colSpan={6} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Aucune methode</td></tr> :
-            methods.map(m => (
+            {isLoading ? <tr><td colSpan={7} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Chargement...</td></tr> :
+            !methods?.length ? <tr><td colSpan={7} className="px-4 py-8 text-center text-[0.8125rem] text-[#999999]">Aucune methode</td></tr> :
+            methods.map(m => {
+              const { rates } = readMethodConfig(m.config);
+              const service = serviceFor(m.id);
+              return (
               <tr key={m.id} className="border-b border-[#f8f8f8] hover:bg-[#fafafa]">
                 <td className="px-4 py-3 text-[0.8125rem]">
                   {m.name}
@@ -197,8 +335,25 @@ export default function AdminShipping() {
                 <td className="px-4 py-3 text-[0.8125rem] text-[#666666]">
                   {carriers.find((c) => c.value === m.carrier)?.label || m.carrier}
                 </td>
-                <td className="px-4 py-3 text-[0.8125rem]">€{parseFloat(String(m.price)).toFixed(2)}</td>
+                <td className="px-4 py-3 text-[0.8125rem] whitespace-nowrap">
+                  {rates.length > 0 ? (
+                    <span title={rates.map((r) => `jusqu'a ${r.upToKg} kg : €${r.price.toFixed(2)}`).join("\n")}>
+                      €{rates[0].price.toFixed(2)}
+                      {rates.length > 1 && <> a €{rates[rates.length - 1].price.toFixed(2)}</>}
+                      <span className="block text-[0.6875rem] text-[#999999]">{rates.length} tranche(s) de poids</span>
+                    </span>
+                  ) : (
+                    <>€{parseFloat(String(m.price)).toFixed(2)}</>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-[0.8125rem] text-[#666666]">{m.estimatedDays || "-"}</td>
+                <td className="px-4 py-3 text-[0.75rem] text-[#666666]">
+                  {servicesLoading ? "..." : service ? service : (
+                    <span className="inline-flex items-center gap-1 text-red-600" title="Les etiquettes ne pourront pas etre creees pour cette offre">
+                      <AlertTriangle size={11} /> Aucun service
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   <button
                     onClick={() => update.mutate({ id: m.id, isActive: !m.isActive })}
@@ -213,7 +368,8 @@ export default function AdminShipping() {
                   <button onClick={() => { if (confirm("Supprimer ?")) del.mutate({ id: m.id }); }} className="p-1 hover:bg-red-50 text-red-600"><Trash2 size={14} /></button>
                 </div></td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
