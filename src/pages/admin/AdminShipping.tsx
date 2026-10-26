@@ -59,10 +59,16 @@ export default function AdminShipping() {
   const [form, setForm] = useState<FormData>(emptyForm);
 
   const { data: sendcloudStatus } = trpc.sendcloud.status.useQuery(undefined, { retry: false });
-  // Services Sendcloud du compte et service retenu pour chaque offre.
+  // Options Sendcloud du compte et option retenue pour chaque offre.
   const { data: sendcloud, isLoading: servicesLoading } = trpc.sendcloud.services.useQuery(undefined, { retry: false });
   const refresh = () => { utils.shipping.listAll.invalidate(); utils.sendcloud.services.invalidate(); };
   const syncMethods = trpc.sendcloud.syncMethods.useMutation({ onSuccess: refresh });
+  // Tarifs Sendcloud releves a plusieurs poids pour pre-remplir la grille.
+  const quoteRates = trpc.sendcloud.quoteRates.useMutation({
+    onSuccess: (data) => {
+      if (data.rates.length > 0) setForm((current) => ({ ...current, rates: toRows(data.rates) }));
+    },
+  });
 
   const create = trpc.shipping.create.useMutation({ onSuccess: () => { refresh(); setShowForm(false); setForm(emptyForm); } });
   const update = trpc.shipping.update.useMutation({ onSuccess: () => { refresh(); setShowForm(false); setEditingId(null); } });
@@ -74,16 +80,20 @@ export default function AdminShipping() {
   const legacyCount = methods?.filter((m) => m.sendcloudMethodId !== null && hasWeightRange(m.name)).length ?? 0;
   const serviceFor = (id: number) => sendcloud?.links.find((l) => l.methodId === id)?.service ?? null;
 
-  // Services possibles pour le transporteur et le mode saisis ; le premier
-  // est celui que le choix automatique retient.
+  // Options possibles pour le transporteur et le mode saisis ; la premiere
+  // est celle que le choix automatique retient.
   const formServices = (sendcloud?.services ?? []).filter(
     (s) => s.carrier === form.carrier && s.requiresServicePoint === form.requiresServicePoint,
   );
-  const chosenService = formServices.find((s) => s.name === form.sendcloudService) ?? formServices[0] ?? null;
+  const chosenService = formServices.find((s) => s.code === form.sendcloudService) ?? formServices[0] ?? null;
 
-  const openCreate = () => { setEditingId(null); setForm(emptyForm); setShowForm(true); };
+  const openCreate = () => { quoteRates.reset(); setEditingId(null); setForm(emptyForm); setShowForm(true); };
   const openEdit = (m: MethodRow) => {
     const config = readMethodConfig(m.config);
+    // Une option choisie avant le passage a l'API v3 etait enregistree par son nom.
+    const stored = config.sendcloudService;
+    const storedService = sendcloud?.services.find((s) => s.code === stored || s.name === stored);
+    quoteRates.reset();
     setEditingId(m.id);
     setForm({
       name: m.name,
@@ -92,7 +102,7 @@ export default function AdminShipping() {
       estimatedDays: m.estimatedDays || "",
       sortOrder: String(m.sortOrder || 0),
       requiresServicePoint: Boolean(m.requiresServicePoint),
-      sendcloudService: config.sendcloudService ?? "",
+      sendcloudService: storedService?.code ?? stored ?? "",
       rates: toRows(config.rates),
     });
     setShowForm(true);
@@ -157,8 +167,8 @@ export default function AdminShipping() {
         )}
         <p className="text-[0.6875rem] text-[#999999]">
           Chaque ligne ci-dessous est un choix propose au client. Son prix suit le poids du colis
-          (grille de tarifs), et la tranche de poids Sendcloud est choisie automatiquement a la
-          creation de l&apos;etiquette.
+          (grille de tarifs). L&apos;etiquette est creee avec l&apos;option Sendcloud indiquee, au poids
+          reel du colis.
         </p>
         {sendcloudStatus?.configured && sendcloud?.error && (
           <p className="text-[0.75rem] text-red-600 mt-2">
@@ -234,13 +244,16 @@ export default function AdminShipping() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999]">Tarif selon le poids du colis</label>
-                  {chosenService && chosenService.suggestedRates.length > 0 && (
-                    <button type="button" onClick={() => setForm({ ...form, rates: toRows(chosenService.suggestedRates) })}
-                      className="text-[0.625rem] uppercase tracking-[1px] text-[#666666] underline">
-                      Reprendre les tarifs Sendcloud
+                  {chosenService && sendcloud?.source === "sendcloud" && (
+                    <button type="button" onClick={() => quoteRates.mutate({ code: chosenService.code })} disabled={quoteRates.isPending}
+                      className="text-[0.625rem] uppercase tracking-[1px] text-[#666666] underline disabled:opacity-50">
+                      {quoteRates.isPending ? "Releve des tarifs..." : "Reprendre les tarifs Sendcloud"}
                     </button>
                   )}
                 </div>
+                {quoteRates.data?.message && (
+                  <p className="text-[0.6875rem] text-[#9a6700] mb-2">{quoteRates.data.message}</p>
+                )}
                 {form.rates.length === 0 ? (
                   <p className="text-[0.75rem] text-[#999999] mb-2">Prix unique, quel que soit le poids du colis.</p>
                 ) : (
@@ -280,22 +293,22 @@ export default function AdminShipping() {
               </label>
 
               <div>
-                <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Service Sendcloud (etiquette)</label>
+                <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Option Sendcloud (etiquette)</label>
                 <select value={form.sendcloudService} onChange={e => setForm({...form, sendcloudService: e.target.value})}
                   className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222] bg-white">
                   <option value="">{formServices[0] ? `Automatique (${formServices[0].name})` : "Automatique"}</option>
                   {formServices.map(s => (
-                    <option key={s.name} value={s.name}>
+                    <option key={s.code} value={s.code}>
                       {s.name}{s.maxWeight !== null ? ` · jusqu'a ${s.maxWeight} kg` : ""}
                     </option>
                   ))}
-                  {form.sendcloudService && !formServices.some(s => s.name === form.sendcloudService) && (
+                  {form.sendcloudService && !formServices.some(s => s.code === form.sendcloudService) && (
                     <option value={form.sendcloudService}>{form.sendcloudService} (introuvable)</option>
                   )}
                 </select>
                 {sendcloud && formServices.length === 0 && (
                   <p className="text-[0.6875rem] text-red-600 mt-1">
-                    Aucun service {carriers.find((c) => c.value === form.carrier)?.label}{" "}
+                    Aucune option {carriers.find((c) => c.value === form.carrier)?.label}{" "}
                     {form.requiresServicePoint ? "en point relais" : "a domicile"} sur votre compte Sendcloud :
                     les etiquettes ne pourront pas etre creees pour cette offre.
                   </p>
@@ -356,7 +369,7 @@ export default function AdminShipping() {
                 <td className="px-4 py-3 text-[0.75rem] text-[#666666]">
                   {servicesLoading ? "..." : service ? service : (
                     <span className="inline-flex items-center gap-1 text-red-600" title="Les etiquettes ne pourront pas etre creees pour cette offre">
-                      <AlertTriangle size={11} /> Aucun service
+                      <AlertTriangle size={11} /> Aucune option
                     </span>
                   )}
                 </td>

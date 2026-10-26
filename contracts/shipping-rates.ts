@@ -1,11 +1,10 @@
 /**
- * Tarif de livraison au poids et rattachement aux services Sendcloud.
+ * Tarif de livraison au poids et rattachement aux options Sendcloud.
  *
  * Une methode de livraison du CRM est une offre telle que le client la voit
  * ("Mondial Relay Point Relais"), avec une grille de prix selon le poids du
- * colis. Sendcloud, lui, decoupe chaque service en une methode par tranche de
- * poids ("Mondial Relay Point Relais 0.5-1kg") : ces tranches ne servent qu'a
- * creer l'etiquette, elles ne sont jamais proposees au client.
+ * colis. Elle est reliee a une option d'expedition Sendcloud, qui ne sert
+ * qu'a creer l'etiquette.
  *
  * Module pur, partage entre le serveur et le CRM.
  */
@@ -95,30 +94,42 @@ export function priceForWeight(
   return base !== null && base >= 0 ? base : fallback;
 }
 
-// ── Services Sendcloud ──────────────────────────────────────
+// ── Options d'expedition Sendcloud ──────────────────────────
 
-/** Une methode Sendcloud, c'est-a-dire une tranche de poids d'un service (kg). */
-export type SendcloudBracket = {
-  id: number;
-  name: string;
-  minWeight: number | null;
-  maxWeight: number | null;
-  price: number | null;
-};
-
-/** Toutes les tranches de poids d'un meme produit Sendcloud. */
+/**
+ * Une option d'expedition Sendcloud (API v3) : un produit transporteur et ses
+ * fonctionnalites ("Mondial Relay Point Relais"). Contrairement aux methodes
+ * de l'API v2, une option couvre toutes les tranches de poids : Sendcloud
+ * applique lui-meme le tarif du poids declare.
+ */
 export type SendcloudService = {
+  /** Code a transmettre a l'annonce du colis ("mondial_relay:standard"). */
+  code: string;
   name: string;
+  /** Nom du produit, sans les options ("Colissimo Home"). */
+  productName: string | null;
+  /** Code transporteur interne (colissimo, chronopost, mondial_relay). */
   carrier: string;
   requiresServicePoint: boolean;
-  /** Triees par poids maximal croissant. */
-  brackets: SendcloudBracket[];
+  /** Poids maximal accepte (kg), null s'il n'est pas communique. */
+  maxWeight: number | null;
+  /** Options qui ecartent l'option du choix automatique. */
+  signature: boolean;
+  locker: boolean;
+  labelless: boolean;
+  returns: boolean;
+  ageCheck: boolean;
+  insured: boolean;
 };
 
 const WEIGHT_RANGE =
   /[\s([-]*\d+(?:[.,]\d+)?\s*(?:k?g)?\s*-\s*\d+(?:[.,]\d+)?\s*k?g[\s)\]]*$/i;
 
-/** "Colissimo Home 0.5-0.75kg" -> "Colissimo Home". */
+/**
+ * "Colissimo Home 0.5-0.75kg" -> "Colissimo Home". Sert a reconnaitre les
+ * tranches importees par l'ancienne synchronisation (API v2) et a reutiliser
+ * leur nom comme indice.
+ */
 export function serviceNameOf(methodName: string): string {
   const name = methodName.trim();
   const stripped = name.replace(WEIGHT_RANGE, "").replace(/[\s:,-]+$/, "").trim();
@@ -136,139 +147,84 @@ function sameName(a: string, b: string): boolean {
 }
 
 /**
- * Plus le score est bas, plus le service est standard. Les variantes
- * (consigne, signature, QR code, retour) ne sont retenues que si on les
- * demande explicitement.
+ * Plus le score est bas, plus l'option est standard. Les variantes
+ * (consigne, signature, QR code sans etiquette, retour...) ne sont retenues
+ * que si on les demande explicitement.
  */
-function serviceRank(name: string): number {
-  const value = name.toLowerCase();
+function serviceRank(service: SendcloudService): number {
+  const name = service.name.toLowerCase();
   let rank = 0;
-  if (/retour|return/.test(value)) rank += 10;
-  if (/locker|consigne/.test(value)) rank += 4;
-  if (/signature/.test(value)) rank += 2;
-  if (/\bqr\b/.test(value)) rank += 1;
+  if (service.returns || /retour|return/.test(name)) rank += 10;
+  if (service.locker || /locker|consigne/.test(name)) rank += 4;
+  if (service.ageCheck) rank += 3;
+  if (service.signature || /signature/.test(name)) rank += 2;
+  if (service.labelless || /\bqr\b/.test(name)) rank += 1;
+  if (service.insured) rank += 1;
   return rank;
-}
-
-/** Poids maximal accepte par le service (kg), null s'il n'est pas borne. */
-export function serviceMaxWeight(service: SendcloudService): number | null {
-  if (service.brackets.length === 0 || service.brackets.some((b) => b.maxWeight === null)) {
-    return null;
-  }
-  return Math.max(...service.brackets.map((b) => b.maxWeight as number));
 }
 
 function compareServices(a: SendcloudService, b: SendcloudService): number {
   return (
     a.carrier.localeCompare(b.carrier) ||
     Number(a.requiresServicePoint) - Number(b.requiresServicePoint) ||
-    serviceRank(a.name) - serviceRank(b.name) ||
-    (serviceMaxWeight(b) ?? Infinity) - (serviceMaxWeight(a) ?? Infinity) ||
+    serviceRank(a) - serviceRank(b) ||
+    (b.maxWeight ?? Infinity) - (a.maxWeight ?? Infinity) ||
     a.name.length - b.name.length ||
     a.name.localeCompare(b.name)
   );
 }
 
 /**
- * Regroupe les methodes Sendcloud (une par tranche de poids) en services.
- * Le resultat est trie : pour un transporteur et un mode donnes, le premier
- * service est celui que le choix automatique retient.
+ * Trie les options : pour un transporteur et un mode donnes, la premiere est
+ * celle que le choix automatique retient.
  */
-export function groupSendcloudServices(
-  methods: Array<SendcloudBracket & { carrier: string; requiresServicePoint: boolean }>,
-): SendcloudService[] {
-  const byKey = new Map<string, SendcloudService>();
-  for (const method of methods) {
-    const name = serviceNameOf(method.name);
-    const key = `${method.carrier}|${method.requiresServicePoint}|${name.toLowerCase()}`;
-    let service = byKey.get(key);
-    if (!service) {
-      service = {
-        name,
-        carrier: method.carrier,
-        requiresServicePoint: method.requiresServicePoint,
-        brackets: [],
-      };
-      byKey.set(key, service);
-    }
-    service.brackets.push({
-      id: method.id,
-      name: method.name,
-      minWeight: method.minWeight,
-      maxWeight: method.maxWeight,
-      price: method.price,
-    });
-  }
-  const services = [...byKey.values()];
-  for (const service of services) {
-    service.brackets.sort((a, b) => (a.maxWeight ?? Infinity) - (b.maxWeight ?? Infinity));
-  }
-  return services.sort(compareServices);
+export function sortServices(services: SendcloudService[]): SendcloudService[] {
+  return [...services].sort(compareServices);
 }
 
 /**
- * Choisit le service Sendcloud d'une livraison : meme transporteur, meme mode
- * (domicile ou point relais). Les indices (service impose, nom de l'offre...)
- * sont essayes dans l'ordre ; a defaut, le service le plus standard l'emporte.
+ * Choisit l'option Sendcloud d'une livraison : meme transporteur, meme mode
+ * (domicile ou point relais). Les indices (option imposee dans le CRM, nom de
+ * l'offre, nom d'une ancienne tranche...) sont essayes dans l'ordre, par code
+ * ou par nom ; a defaut, l'option la plus standard l'emporte.
  */
 export function pickSendcloudService(
   services: SendcloudService[],
   target: { carrier: string; servicePoint: boolean; hints?: Array<string | null | undefined> },
 ): SendcloudService | null {
-  const candidates = services
-    .filter((s) => s.carrier === target.carrier && s.requiresServicePoint === target.servicePoint)
-    .sort(compareServices);
+  const candidates = sortServices(
+    services.filter((s) => s.carrier === target.carrier && s.requiresServicePoint === target.servicePoint),
+  );
   for (const hint of target.hints ?? []) {
     if (!hint) continue;
     const wanted = serviceNameOf(hint);
-    const match = candidates.find((s) => sameName(s.name, wanted));
+    const match = candidates.find(
+      (s) =>
+        sameName(s.code, hint) ||
+        sameName(s.name, wanted) ||
+        (s.productName !== null && sameName(s.productName, wanted)),
+    );
     if (match) return match;
   }
   return candidates[0] ?? null;
 }
 
-/** Indices permettant de retrouver le service Sendcloud d'une offre du CRM. */
-export function offerServiceHints(
-  services: SendcloudService[],
-  offer: { name: string; sendcloudMethodId?: number | null; config?: unknown },
-): string[] {
-  const hints: string[] = [];
+/** Indices permettant de retrouver l'option Sendcloud d'une offre du CRM. */
+export function offerServiceHints(offer: { name: string; config?: unknown }): string[] {
   const { sendcloudService } = readMethodConfig(offer.config);
-  if (sendcloudService) hints.push(sendcloudService);
-  // Ligne creee par l'ancienne synchronisation, reliee a une tranche precise.
-  if (offer.sendcloudMethodId) {
-    const legacy = services.find((s) => s.brackets.some((b) => b.id === offer.sendcloudMethodId));
-    if (legacy) hints.push(legacy.name);
-  }
-  hints.push(offer.name);
-  return hints;
+  return sendcloudService ? [sendcloudService, offer.name] : [offer.name];
 }
 
 /**
- * Tranche Sendcloud a utiliser pour un colis : la premiere qui couvre son
- * poids. Un colis plus leger que la premiere tranche prend celle-ci ; plus
- * lourd que la derniere, aucune ne convient.
+ * Grille de prix a partir de tarifs Sendcloud releves a plusieurs poids : les
+ * poids consecutifs au meme prix sont fusionnes en une seule tranche.
  */
-export function pickBracket(service: SendcloudService, weightKg: number): SendcloudBracket | null {
-  const fits = service.brackets.find(
-    (b) =>
-      (b.minWeight === null || weightKg >= b.minWeight) &&
-      (b.maxWeight === null || weightKg <= b.maxWeight),
-  );
-  return fits ?? service.brackets.find((b) => b.maxWeight === null || weightKg <= b.maxWeight) ?? null;
-}
-
-/**
- * Grille de prix deduite des tarifs Sendcloud du service, les tranches
- * consecutives au meme prix etant fusionnees. Vide quand Sendcloud ne
- * communique pas de prix (contrat transporteur propre, par exemple).
- */
-export function ratesFromService(service: SendcloudService): RateTier[] {
+export function ratesFromQuotes(quotes: Array<{ upToKg: number; price: number | null }>): RateTier[] {
   const tiers: RateTier[] = [];
-  for (const bracket of service.brackets) {
-    if (bracket.price === null || bracket.price <= 0 || bracket.maxWeight === null) return [];
-    const upToKg = round(bracket.maxWeight, 2);
-    const price = round(bracket.price, 2);
+  for (const quote of [...quotes].sort((a, b) => a.upToKg - b.upToKg)) {
+    if (quote.price === null || quote.price <= 0) continue;
+    const upToKg = round(quote.upToKg, 2);
+    const price = round(quote.price, 2);
     const last = tiers[tiers.length - 1];
     if (last && last.price === price) last.upToKg = upToKg;
     else tiers.push({ upToKg, price });

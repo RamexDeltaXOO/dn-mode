@@ -1,11 +1,14 @@
 import { ConfigKeys, CARRIER_LIST } from "@contracts/constants";
+import type { SendcloudService } from "@contracts/shipping-rates";
 import { getConfigValue } from "./site-config";
 
 /**
  * Client Sendcloud (sans dependance externe, base sur fetch).
  *
  * Sendcloud sert de passerelle unique vers Colissimo (La Poste), Chronopost
- * et Mondial Relay. Les cles API se saisissent dans le CRM
+ * et Mondial Relay. Les options d'expedition et la creation des colis passent
+ * par l'API v3 : la creation de colis en v2 est fermee aux comptes ouverts
+ * depuis avril 2026. Les points relais et le suivi restent en v2. Les cles API se saisissent dans le CRM
  * (Admin > Parametres > Livraison Sendcloud) et sont stockees dans
  * `site_config` ; les variables d'environnement servent de repli.
  *
@@ -15,21 +18,11 @@ import { getConfigValue } from "./site-config";
  */
 
 const PANEL_API = "https://panel.sendcloud.sc/api/v2";
+const V3_API = "https://panel.sendcloud.sc/api/v3";
 const SERVICE_POINTS_API = "https://servicepoints.sendcloud.sc/api/v2";
 const TIMEOUT_MS = 15_000;
 
 // ── Types exposes ───────────────────────────────────────────
-export type SendcloudMethod = {
-  id: number;
-  name: string;
-  carrier: string;
-  price: number | null;
-  minWeight: number | null;
-  maxWeight: number | null;
-  countries: string[];
-  requiresServicePoint: boolean;
-};
-
 export type ServicePoint = {
   id: string;
   name: string;
@@ -136,12 +129,7 @@ async function sendcloudRequest<T>(
     }
 
     if (!response.ok) {
-      const errorObj = (parsed as { error?: { message?: string } } | null)?.error;
-      return {
-        ok: false,
-        error: errorObj?.message || `Erreur Sendcloud (${response.status})`,
-        status: response.status,
-      };
+      return { ok: false, error: sendcloudErrorMessage(parsed, response.status), status: response.status };
     }
 
     return { ok: true, data: parsed as T };
@@ -156,6 +144,28 @@ async function sendcloudRequest<T>(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+// ── Erreurs ─────────────────────────────────────────────────
+/** Message lisible d'une erreur Sendcloud : `error.message` en v2, `errors[]` en v3. */
+export function sendcloudErrorMessage(parsed: unknown, status: number): string {
+  const body = parsed as { error?: { message?: unknown }; errors?: unknown } | null;
+  if (typeof body?.error?.message === "string" && body.error.message) return body.error.message;
+  const details = (Array.isArray(body?.errors) ? body.errors : []).map(formatV3Error).filter(Boolean);
+  return details.length > 0 ? details.join(" ; ") : `Erreur Sendcloud (${status})`;
+}
+
+/** "to_address/name : This field is required." */
+function formatV3Error(raw: unknown): string {
+  const error = raw as { detail?: unknown; title?: unknown; source?: { pointer?: unknown } } | null;
+  const detail = String(error?.detail ?? error?.title ?? "").trim();
+  if (!detail) return "";
+  const pointer = typeof error?.source?.pointer === "string" ? error.source.pointer.replace(/^\//, "") : "";
+  return pointer ? `${pointer} : ${detail}` : detail;
+}
+
+export function parcelFailure(message: string): ParcelResult {
+  return { ok: false, message, parcelId: null, trackingNumber: null, trackingUrl: null, labelUrl: null };
 }
 
 // ── Utilitaires ─────────────────────────────────────────────
@@ -220,42 +230,39 @@ function parseOpeningHours(raw: unknown): string[] {
 }
 
 // ── Jeu de donnees de demonstration ─────────────────────────
-export const DEMO_METHODS: SendcloudMethod[] = [
-  {
-    id: 9001,
-    name: "Colissimo Domicile",
-    carrier: "colissimo",
-    price: 5.9,
-    minWeight: 0,
+function demoService(
+  code: string,
+  name: string,
+  carrier: string,
+  requiresServicePoint: boolean,
+): SendcloudService {
+  return {
+    code,
+    name,
+    productName: name,
+    carrier,
+    requiresServicePoint,
     maxWeight: 30,
-    countries: ["FR"],
-    requiresServicePoint: false,
-  },
-  {
-    id: 9002,
-    name: "Chronopost Express",
-    carrier: "chronopost",
-    price: 9.9,
-    minWeight: 0,
-    maxWeight: 30,
-    countries: ["FR"],
-    requiresServicePoint: false,
-  },
-  {
-    id: 9003,
-    name: "Mondial Relay Point Relais",
-    carrier: "mondial_relay",
-    price: 4.5,
-    minWeight: 0,
-    maxWeight: 20,
-    countries: ["FR"],
-    requiresServicePoint: true,
-  },
+    signature: false,
+    locker: false,
+    labelless: false,
+    returns: false,
+    ageCheck: false,
+    insured: false,
+  };
+}
+
+export const DEMO_SERVICES: SendcloudService[] = [
+  demoService("colissimo:home", "Colissimo Domicile", "colissimo", false),
+  demoService("chronopost:express", "Chronopost Express", "chronopost", false),
+  demoService("mondial_relay:service_point", "Mondial Relay Point Relais", "mondial_relay", true),
 ];
 
-/** Tarif de repli par transporteur (utilise quand Sendcloud ne renvoie pas de prix). */
+const DEMO_PRICES: Record<string, number> = { colissimo: 5.9, chronopost: 9.9, mondial_relay: 4.5 };
+
+/** Tarif de repli par transporteur, pour une offre creee sans prix. */
 export function demoPriceFor(carrier: string): number {
-  return DEMO_METHODS.find((m) => m.carrier === normalizeCarrier(carrier))?.price ?? 5.9;
+  return DEMO_PRICES[normalizeCarrier(carrier)] ?? 5.9;
 }
 
 const DEMO_POINT_NAMES = [
@@ -310,73 +317,148 @@ export async function getAccount(): Promise<{
   };
 }
 
-// ── Methodes d'expedition ───────────────────────────────────
-export type RawShippingMethod = {
-  id?: unknown;
+// ── Options d'expedition (API v3) ───────────────────────────
+type RawWeight = { value?: unknown; unit?: unknown } | null | undefined;
+
+function weightInKg(raw: RawWeight): number | null {
+  const value = toNumber(raw?.value);
+  if (value === null) return null;
+  const unit = String(raw?.unit ?? "kg").toLowerCase();
+  if (unit === "g") return value / 1000;
+  if (unit === "lb" || unit === "lbs") return value * 0.45359237;
+  if (unit === "oz") return value * 0.028349523;
+  return value;
+}
+
+export type RawShippingOption = {
+  code?: unknown;
   name?: unknown;
-  carrier?: unknown;
-  min_weight?: unknown;
-  max_weight?: unknown;
-  price?: unknown;
-  service_point_input?: unknown;
-  countries?: Array<{ iso_2?: unknown; price?: unknown }>;
+  carrier?: { code?: unknown; name?: unknown } | null;
+  product?: { code?: unknown; name?: unknown } | null;
+  functionalities?: Record<string, unknown> | null;
+  weight?: { min?: RawWeight; max?: RawWeight } | null;
+  requirements?: { is_service_point_required?: unknown } | null;
+  quotes?: Array<{ price?: { total?: { value?: unknown } | null } | null } | null> | null;
 };
 
-export function mapShippingMethod(raw: RawShippingMethod): SendcloudMethod | null {
-  const id = toNumber(raw?.id);
-  if (id === null) return null;
+const SERVICE_POINT_LAST_MILES = new Set(["service_point", "locker", "locker_or_service_point"]);
 
-  const countryEntries = Array.isArray(raw.countries) ? raw.countries : [];
-  const countries = countryEntries
-    .map((c) => String(c?.iso_2 ?? "").toUpperCase())
-    .filter((code) => code !== "");
-
-  // Le prix racine vaut 0 sur la plupart des comptes : c'est le prix vers la
-  // France qui compte. Un 0 signifie "tarif non communique", jamais "gratuit".
-  const frEntry = countryEntries.find((c) => String(c?.iso_2 ?? "").toUpperCase() === "FR");
-  const price = positive(frEntry?.price) ?? positive(raw.price);
-
+export function mapShippingOption(raw: RawShippingOption): SendcloudService | null {
+  const code = typeof raw?.code === "string" ? raw.code.trim() : "";
+  if (!code) return null;
+  const functionalities = raw.functionalities ?? {};
+  const lastMile = String(functionalities.last_mile ?? "").toLowerCase();
+  const ageCheck = functionalities.age_check;
   return {
-    id,
-    name: String(raw.name ?? `Methode ${id}`),
-    carrier: normalizeCarrier(raw.carrier),
-    price,
-    minWeight: toNumber(raw.min_weight),
-    maxWeight: toNumber(raw.max_weight),
-    countries,
-    requiresServicePoint: String(raw.service_point_input ?? "none").toLowerCase() === "required",
+    code,
+    name: String(raw.name ?? raw.product?.name ?? code),
+    productName: raw.product?.name ? String(raw.product.name) : null,
+    carrier: normalizeCarrier(raw.carrier?.code ?? code.split(":")[0]),
+    requiresServicePoint:
+      raw.requirements?.is_service_point_required === true || SERVICE_POINT_LAST_MILES.has(lastMile),
+    maxWeight: weightInKg(raw.weight?.max),
+    signature: functionalities.signature === true,
+    locker: lastMile === "locker",
+    labelless: functionalities.labelless === true,
+    returns: functionalities.returns === true,
+    ageCheck: ageCheck !== null && ageCheck !== undefined && ageCheck !== false,
+    insured: (toNumber(functionalities.insurance) ?? 0) > 0,
   };
 }
 
-export async function listShippingMethods(): Promise<{
+/** Cout Sendcloud du premier devis d'une option, s'il est communique. */
+function quotePrice(raw: RawShippingOption): number | null {
+  const quote = Array.isArray(raw.quotes) ? raw.quotes[0] : null;
+  return positive(quote?.price?.total?.value);
+}
+
+export type ShippingOptionsQuery = {
+  toPostalCode?: string | null;
+  toCity?: string | null;
+  /** Point relais choisi : seules les options qui le desservent sont renvoyees. */
+  servicePointId?: string | null;
+  /** Poids du colis : seules les options qui l'acceptent sont renvoyees. */
+  weightKg?: number | null;
+  /** Restreint a une option precise (devis). */
+  code?: string;
+  calculateQuotes?: boolean;
+};
+
+/** Corps de la recherche d'options : depuis et vers la France metropolitaine. */
+export function shippingOptionsBody(query: ShippingOptionsQuery): Record<string, unknown> {
+  const toAddress: Record<string, string> = { country_code: "FR" };
+  if (query.toPostalCode) toAddress.postal_code = query.toPostalCode;
+  if (query.toCity) toAddress.city = query.toCity;
+  const body: Record<string, unknown> = {
+    from_address: { country_code: "FR" },
+    to_address: toAddress,
+  };
+  if (query.servicePointId) body.to_service_point = { id: String(query.servicePointId) };
+  if (query.weightKg && query.weightKg > 0) {
+    body.parcels = [{ weight: { value: query.weightKg.toFixed(3), unit: "kg" } }];
+  }
+  if (query.code) body.shipping_option_code = query.code;
+  if (query.calculateQuotes) body.calculate_quotes = true;
+  return body;
+}
+
+/** Options d'expedition du compte pour les transporteurs supportes. */
+export async function listShippingOptions(query: ShippingOptionsQuery = {}): Promise<{
   source: "sendcloud" | "demo";
-  methods: SendcloudMethod[];
+  services: SendcloudService[];
   error?: string;
 }> {
   const creds = await getSendcloudCredentials();
-  if (!creds.configured) return { source: "demo", methods: DEMO_METHODS };
+  if (!creds.configured) return { source: "demo", services: DEMO_SERVICES };
 
-  const result = await sendcloudRequest<{ shipping_methods?: RawShippingMethod[] }>(
-    "/shipping_methods",
-    { creds },
-  );
-  if (!result.ok) return { source: "demo", methods: DEMO_METHODS, error: result.error };
+  const result = await sendcloudRequest<{ data?: RawShippingOption[] | null }>("/shipping-options", {
+    method: "POST",
+    body: shippingOptionsBody(query),
+    base: V3_API,
+    creds,
+  });
+  if (!result.ok) return { source: "demo", services: DEMO_SERVICES, error: result.error };
 
-  const raw = Array.isArray(result.data?.shipping_methods) ? result.data.shipping_methods : [];
-  const methods = raw
-    .map(mapShippingMethod)
-    .filter((m): m is SendcloudMethod => m !== null);
-
-  return { source: "sendcloud", methods };
+  const supported = new Set(CARRIER_LIST.map((c) => c.code as string));
+  const raw = Array.isArray(result.data?.data) ? result.data.data : [];
+  const services = raw
+    .map(mapShippingOption)
+    .filter((s): s is SendcloudService => s !== null && supported.has(s.carrier));
+  return { source: "sendcloud", services };
 }
 
-/** Ne garde que les methodes des 3 transporteurs supportes, livrables en France. */
-export function filterFrenchCarrierMethods(methods: SendcloudMethod[]): SendcloudMethod[] {
-  const supported = new Set(CARRIER_LIST.map((c) => c.code as string));
-  return methods.filter(
-    (m) =>
-      supported.has(m.carrier) && (m.countries.length === 0 || m.countries.includes("FR")),
+/** Cout Sendcloud d'une option pour un poids donne, null s'il n'est pas communique. */
+export async function quoteShippingOption(code: string, weightKg: number): Promise<number | null> {
+  const result = await sendcloudRequest<{ data?: RawShippingOption[] | null }>("/shipping-options", {
+    method: "POST",
+    body: shippingOptionsBody({ code, weightKg, calculateQuotes: true }),
+    base: V3_API,
+  });
+  if (!result.ok) return null;
+  const options = Array.isArray(result.data?.data) ? result.data.data : [];
+  const option = options.find((o) => o?.code === code);
+  return option ? quotePrice(option) : null;
+}
+
+/**
+ * Adresse d'expedition : celle saisie dans le CRM, sinon la premiere adresse
+ * francaise du compte Sendcloud. L'API v3 l'exige, la v2 prenait d'office
+ * l'adresse par defaut du compte.
+ */
+export async function resolveSenderAddressId(): Promise<{ id: number | null; error?: string }> {
+  const creds = await getSendcloudCredentials();
+  const configured = Number.parseInt(creds.senderAddressId, 10);
+  if (Number.isFinite(configured) && configured > 0) return { id: configured };
+
+  const result = await sendcloudRequest<{ data?: Array<{ id?: unknown; country_code?: unknown }> }>(
+    "/addresses/sender-addresses",
+    { base: V3_API, creds },
   );
+  if (!result.ok) return { id: null, error: result.error };
+  const addresses = Array.isArray(result.data?.data) ? result.data.data : [];
+  const chosen =
+    addresses.find((a) => String(a?.country_code ?? "").toUpperCase() === "FR") ?? addresses[0];
+  return { id: toNumber(chosen?.id) };
 }
 
 // ── Points relais ───────────────────────────────────────────
@@ -473,7 +555,7 @@ function mapParcel(raw: RawParcel | null | undefined): Omit<ParcelResult, "ok" |
   };
 }
 
-export async function createParcel(input: {
+export type ShipmentInput = {
   name: string;
   address: string;
   city: string;
@@ -482,76 +564,155 @@ export async function createParcel(input: {
   email: string;
   telephone?: string;
   orderNumber: string;
+  /** Poids du colis (kg). */
   weight: number;
-  shippingMethodId: number;
+  /** Code de l'option Sendcloud ("mondial_relay:standard"). */
+  shippingOptionCode: string;
   servicePointId?: string | null;
-}): Promise<ParcelResult> {
-  const creds = await getSendcloudCredentials();
-  if (!creds.configured) {
-    return {
-      ok: false,
-      message:
-        "Sendcloud n'est pas configure. Renseignez vos cles API dans Parametres > Livraison Sendcloud.",
-      parcelId: null,
-      trackingNumber: null,
-      trackingUrl: null,
-      labelUrl: null,
-    };
-  }
+  senderAddressId: number;
+};
 
+/** La boutique livre la France : le pays est stocke en toutes lettres ("France"). */
+function countryCode(country: string): string {
+  const value = (country || "").trim();
+  if (!value || /^fr/i.test(value)) return "FR";
+  return value.length === 2 ? value.toUpperCase() : value;
+}
+
+/** Corps de l'annonce d'un colis (API v3, POST /shipments/announce). */
+export function buildShipmentBody(input: ShipmentInput): Record<string, unknown> {
   const { street, houseNumber } = splitStreet(input.address);
-  const senderAddressId = Number.parseInt(creds.senderAddressId, 10);
-
-  const parcelBody: Record<string, unknown> = {
+  const toAddress: Record<string, string> = {
     name: input.name || "Client",
-    address: street,
+    address_line_1: street,
     house_number: houseNumber,
-    city: input.city || "",
-    postal_code: input.postalCode || "",
-    country: (input.country || "FR").slice(0, 2).toUpperCase() === "FR" ? "FR" : input.country,
-    telephone: input.telephone || "",
+    postal_code: input.postalCode,
+    city: input.city,
+    country_code: countryCode(input.country),
     email: input.email,
-    order_number: input.orderNumber,
-    weight: input.weight.toFixed(3),
-    request_label: true,
-    shipment: { id: input.shippingMethodId },
   };
-  if (Number.isFinite(senderAddressId) && senderAddressId > 0) {
-    parcelBody.sender_address = senderAddressId;
-  }
-  if (input.servicePointId) {
-    const numericPoint = Number.parseInt(input.servicePointId, 10);
-    parcelBody.to_service_point = Number.isFinite(numericPoint) ? numericPoint : input.servicePointId;
+  if (input.telephone) toAddress.phone_number = input.telephone;
+
+  const body: Record<string, unknown> = {
+    from_address: { sender_address_id: input.senderAddressId },
+    to_address: toAddress,
+    ship_with: {
+      type: "shipping_option_code",
+      properties: { shipping_option_code: input.shippingOptionCode },
+    },
+    order_number: input.orderNumber,
+    parcels: [{ weight: { value: input.weight.toFixed(3), unit: "kg" } }],
+  };
+  if (input.servicePointId) body.to_service_point = { id: String(input.servicePointId) };
+  return body;
+}
+
+type RawShipment = {
+  errors?: unknown;
+  parcels?: Array<{
+    id?: unknown;
+    status?: { code?: unknown; message?: unknown } | null;
+    tracking_number?: unknown;
+    tracking_url?: unknown;
+    documents?: Array<{ type?: unknown; document_type?: unknown; link?: unknown } | null> | null;
+  } | null> | null;
+};
+
+/**
+ * Lit la reponse d'une annonce. Un HTTP 201 ne suffit pas : si le
+ * transporteur refuse le colis, la reponse porte le statut
+ * ANNOUNCEMENT_FAILED et le detail dans `errors`.
+ */
+export function readShipmentResult(raw: RawShipment | null | undefined): ParcelResult {
+  const parcel = Array.isArray(raw?.parcels) ? raw.parcels[0] : null;
+  const errors = (Array.isArray(raw?.errors) ? raw.errors : []).map(formatV3Error).filter(Boolean);
+  const status = String(parcel?.status?.code ?? "").toUpperCase();
+  const failed =
+    !parcel || status === "ANNOUNCEMENT_FAILED" || (errors.length > 0 && !parcel.tracking_number);
+  if (failed) {
+    return parcelFailure(
+      errors.length > 0
+        ? `Sendcloud a refuse le colis : ${errors.join(" ; ")}`
+        : "Sendcloud n'a pas pu annoncer le colis au transporteur.",
+    );
   }
 
-  const result = await sendcloudRequest<{ parcel?: RawParcel }>("/parcels", {
-    method: "POST",
-    body: { parcel: parcelBody },
-    creds,
-  });
-
-  if (!result.ok) {
-    return {
-      ok: false,
-      message: result.error,
-      parcelId: null,
-      trackingNumber: null,
-      trackingUrl: null,
-      labelUrl: null,
-    };
-  }
-
-  const parcel = mapParcel(result.data?.parcel);
+  const parcelId = parcel.id !== undefined && parcel.id !== null ? String(parcel.id) : null;
+  const documents = Array.isArray(parcel.documents) ? parcel.documents : [];
+  const label = documents.find((d) => d?.document_type === "label" || d?.type === "label");
+  const statusMessage = parcel.status?.message ? String(parcel.status.message) : null;
   return {
     ok: true,
-    message: parcel.status ? `Etiquette creee (${parcel.status})` : "Etiquette creee",
-    parcelId: parcel.parcelId,
-    trackingNumber: parcel.trackingNumber,
-    trackingUrl: parcel.trackingUrl,
-    labelUrl: parcel.labelUrl,
+    message: statusMessage ? `Etiquette creee (${statusMessage})` : "Etiquette creee",
+    parcelId,
+    trackingNumber: parcel.tracking_number ? String(parcel.tracking_number) : null,
+    trackingUrl: parcel.tracking_url ? String(parcel.tracking_url) : null,
+    labelUrl: label?.link
+      ? String(label.link)
+      : parcelId
+        ? `${V3_API}/parcels/${parcelId}/documents/label`
+        : null,
   };
 }
 
+/** Cree le colis et son etiquette (annonce synchrone, API v3). */
+export async function announceShipment(input: ShipmentInput): Promise<ParcelResult> {
+  const creds = await getSendcloudCredentials();
+  if (!creds.configured) {
+    return parcelFailure(
+      "Sendcloud n'est pas configure. Renseignez vos cles API dans Parametres > Livraison Sendcloud.",
+    );
+  }
+  const result = await sendcloudRequest<{ data?: RawShipment }>("/shipments/announce", {
+    method: "POST",
+    body: buildShipmentBody(input),
+    base: V3_API,
+    creds,
+  });
+  if (!result.ok) return parcelFailure(result.error);
+  return readShipmentResult(result.data?.data);
+}
+
+/**
+ * Telecharge le PDF d'une etiquette. Les liens Sendcloud exigent les cles
+ * API : le CRM passe donc par le serveur, et seuls les liens de l'API
+ * Sendcloud sont suivis, pour ne jamais envoyer les cles ailleurs.
+ */
+export async function fetchLabelPdf(
+  url: string,
+): Promise<{ ok: true; base64: string } | { ok: false; error: string }> {
+  if (!url.startsWith("https://panel.sendcloud.sc/api/")) {
+    return { ok: false, error: "Lien d'etiquette inattendu." };
+  }
+  const creds = await getSendcloudCredentials();
+  if (!creds.configured) return { ok: false, error: "Sendcloud n'est pas configure." };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      headers: { Authorization: authHeader(creds), Accept: "application/pdf" },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      let parsed: unknown = null;
+      try {
+        parsed = text ? JSON.parse(text) : null;
+      } catch {
+        parsed = null;
+      }
+      return { ok: false, error: sendcloudErrorMessage(parsed, response.status) };
+    }
+    return { ok: true, base64: Buffer.from(await response.arrayBuffer()).toString("base64") };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Erreur reseau" };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** Suivi d'un colis (API v2, toujours ouverte, y compris pour les colis crees en v3). */
 export async function getParcel(parcelId: string): Promise<{
   ok: boolean;
   trackingNumber: string | null;

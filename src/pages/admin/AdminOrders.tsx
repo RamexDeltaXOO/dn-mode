@@ -54,6 +54,20 @@ export default function AdminOrders() {
     },
   });
 
+  // Les liens d'etiquette Sendcloud exigent les cles API : le PDF passe par le serveur.
+  const labelPdf = trpc.sendcloud.labelPdf.useMutation({
+    onSuccess: (data) => {
+      if (!data.ok) return;
+      const bytes = Uint8Array.from(atob(data.base64), (c) => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = data.filename;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    },
+  });
+
   const { data: orderDetail } = trpc.order.getById.useQuery(
     { id: expandedOrder! },
     { enabled: !!expandedOrder }
@@ -256,17 +270,20 @@ export default function AdminOrders() {
                                     : "Creer l'etiquette Sendcloud"}
                               </button>
                               {orderDetail.labelUrl && (
-                                <a
-                                  href={orderDetail.labelUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-1 text-[0.625rem] uppercase tracking-[1px] border border-[#e0e0e0] px-3 py-1.5 hover:border-[#222222]"
+                                <button
+                                  onClick={() => labelPdf.mutate({ orderId: orderDetail.id })}
+                                  disabled={labelPdf.isPending}
+                                  className="flex items-center gap-1 text-[0.625rem] uppercase tracking-[1px] border border-[#e0e0e0] px-3 py-1.5 hover:border-[#222222] disabled:opacity-40"
                                 >
                                   <FileDown size={11} />
-                                  Telecharger l&apos;etiquette
-                                </a>
+                                  {labelPdf.isPending ? "Telechargement..." : "Telecharger l'etiquette"}
+                                </button>
                               )}
                             </div>
+
+                            {labelPdf.data && !labelPdf.data.ok && (
+                              <p className="text-[0.6875rem] mt-2 text-red-600">{labelPdf.data.message}</p>
+                            )}
 
                             {createLabel.data && (
                               <p

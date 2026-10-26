@@ -6,35 +6,28 @@ import { orders, orderItems, shippingMethods } from "@db/schema";
 import { carrierLabel } from "@contracts/constants";
 import {
   type SendcloudService,
-  groupSendcloudServices,
   hasWeightRange,
   offerServiceHints,
-  pickBracket,
   pickSendcloudService,
-  ratesFromService,
-  serviceMaxWeight,
-  writeMethodConfig,
+  ratesFromQuotes,
+  sortServices,
 } from "@contracts/shipping-rates";
 import { gramsToKg, parcelWeightGrams } from "./lib/weight";
 import {
-  type ParcelResult,
-  createParcel,
+  announceShipment,
   demoPriceFor,
-  filterFrenchCarrierMethods,
+  fetchLabelPdf,
   getAccount,
   getParcel,
   getSendcloudCredentials,
-  listShippingMethods,
+  listShippingOptions,
+  parcelFailure,
+  quoteShippingOption,
+  resolveSenderAddressId,
   searchServicePoints,
 } from "./lib/sendcloud";
 
-/** Services Sendcloud du compte (ou de demonstration), regroupes par produit. */
-async function loadServices() {
-  const { source, methods, error } = await listShippingMethods();
-  return { source, error, services: groupSendcloudServices(filterFrenchCarrierMethods(methods)) };
-}
-
-/** Service Sendcloud retenu pour une offre du CRM. */
+/** Option Sendcloud retenue pour une offre du CRM. */
 function serviceForOffer(
   services: SendcloudService[],
   offer: typeof shippingMethods.$inferSelect,
@@ -42,7 +35,7 @@ function serviceForOffer(
   return pickSendcloudService(services, {
     carrier: offer.carrier,
     servicePoint: Boolean(offer.requiresServicePoint),
-    hints: offerServiceHints(services, offer),
+    hints: offerServiceHints(offer),
   });
 }
 
@@ -52,21 +45,13 @@ function defaultOfferName(service: SendcloudService): string {
   return `${carrier} ${service.requiresServicePoint ? "Point Relais" : "Domicile"}`;
 }
 
-/** Sendcloud borne ses tranches a 30.001 kg : on affiche 30 kg. */
+/** Sendcloud borne ses poids a 30.001 kg : on affiche 30 kg. */
 function roundKg(value: number | null): number | null {
   return value === null ? null : Math.round(value * 100) / 100;
 }
 
-function labelError(message: string): ParcelResult {
-  return {
-    ok: false,
-    message,
-    parcelId: null,
-    trackingNumber: null,
-    trackingUrl: null,
-    labelUrl: null,
-  };
-}
+/** Poids de reference pour relever les tarifs Sendcloud d'une option. */
+const QUOTE_WEIGHTS_KG = [0.25, 0.5, 1, 2, 5, 10, 20, 30];
 
 /**
  * Routeur Sendcloud : configuration, synchronisation des methodes,
@@ -102,26 +87,21 @@ export const sendcloudRouter = createRouter({
     };
   }),
 
-  listCarrierMethods: adminQuery.query(async () => {
-    const { source, methods } = await listShippingMethods();
-    return { source, methods: filterFrenchCarrierMethods(methods) };
-  }),
-
-  /** Services Sendcloud disponibles, et celui que chaque offre utilisera. */
+  /** Options Sendcloud disponibles, et celle que chaque offre utilisera. */
   services: adminQuery.query(async () => {
     const db = getDb();
-    const { source, error, services } = await loadServices();
+    const { source, error, services } = await listShippingOptions();
     const offers = await db.select().from(shippingMethods);
     return {
       source,
       error: error ?? null,
-      services: services.map((s) => ({
+      // Triees : pour un transporteur et un mode, la premiere est le choix automatique.
+      services: sortServices(services).map((s) => ({
+        code: s.code,
         name: s.name,
         carrier: s.carrier,
         requiresServicePoint: s.requiresServicePoint,
-        maxWeight: roundKg(serviceMaxWeight(s)),
-        brackets: s.brackets.length,
-        suggestedRates: ratesFromService(s),
+        maxWeight: roundKg(s.maxWeight),
       })),
       links: offers.map((offer) => ({
         methodId: offer.id,
@@ -130,19 +110,38 @@ export const sendcloudRouter = createRouter({
     };
   }),
 
+  /** Releve les tarifs Sendcloud d'une option a plusieurs poids, pour pre-remplir une grille. */
+  quoteRates: adminQuery
+    .input(z.object({ code: z.string().min(1).max(200) }))
+    .mutation(async ({ input }) => {
+      const prices = await Promise.all(
+        QUOTE_WEIGHTS_KG.map(async (upToKg) => ({
+          upToKg,
+          price: await quoteShippingOption(input.code, upToKg),
+        })),
+      );
+      const rates = ratesFromQuotes(prices);
+      return {
+        rates,
+        message:
+          rates.length > 0
+            ? null
+            : "Sendcloud ne communique pas de tarif pour cette option (contrat transporteur propre, par exemple).",
+      };
+    }),
+
   /**
-   * Relie les offres du CRM aux services Sendcloud.
+   * Relie les offres du CRM aux options Sendcloud.
    *
-   * Sendcloud expose une methode par tranche de poids ; l'ancienne
-   * synchronisation en faisait autant de choix au checkout, sans prix. Ces
-   * lignes sont supprimees : la tranche est desormais choisie a la creation
-   * de l'etiquette, d'apres le poids reel du colis, et le prix client vient
-   * de la grille de chaque offre.
+   * L'ancienne synchronisation (API v2) importait une methode par tranche de
+   * poids, autant de choix au checkout, sans prix. Ces lignes sont
+   * supprimees : le prix client vient de la grille de chaque offre, et
+   * Sendcloud applique lui-meme le tarif du poids declare sur l'etiquette.
    */
   syncMethods: adminQuery.mutation(async () => {
     const db = getDb();
     const creds = await getSendcloudCredentials();
-    const { source, error, services } = await loadServices();
+    const { source, error, services } = await listShippingOptions();
     if (creds.configured && source !== "sendcloud") {
       return {
         removed: 0,
@@ -161,22 +160,20 @@ export const sendcloudRouter = createRouter({
     let offers = rows.filter((r) => !legacy.includes(r));
 
     // Aucune offre : une par transporteur et par mode (domicile / point
-    // relais), avec le service le plus standard.
+    // relais), avec l'option la plus standard.
     let created = 0;
     if (offers.length === 0) {
       const seen = new Set<string>();
-      for (const service of services) {
+      for (const service of sortServices(services)) {
         const key = `${service.carrier}|${service.requiresServicePoint}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        const rates = ratesFromService(service);
         created += 1;
         await db.insert(shippingMethods).values({
           name: defaultOfferName(service),
           carrier: service.carrier,
-          price: String(rates[0]?.price ?? demoPriceFor(service.carrier)),
+          price: String(demoPriceFor(service.carrier)),
           requiresServicePoint: service.requiresServicePoint,
-          config: writeMethodConfig(null, { rates }),
           countries: ["FR"],
           sortOrder: created,
           isActive: true,
@@ -193,10 +190,9 @@ export const sendcloudRouter = createRouter({
         unlinked.push(offer.name);
         continue;
       }
-      const maxWeight = serviceMaxWeight(service);
       await db
         .update(shippingMethods)
-        .set({ minWeight: null, maxWeight: maxWeight !== null ? String(maxWeight) : null })
+        .set({ minWeight: null, maxWeight: service.maxWeight !== null ? String(service.maxWeight) : null })
         .where(eq(shippingMethods.id, offer.id));
     }
 
@@ -204,7 +200,7 @@ export const sendcloudRouter = createRouter({
       legacy.length > 0 ? `${legacy.length} tranche(s) de poids regroupee(s)` : null,
       created > 0 ? `${created} offre(s) creee(s)` : null,
       `${offers.length - unlinked.length} offre(s) reliee(s) a Sendcloud`,
-      unlinked.length > 0 ? `Aucun service Sendcloud pour : ${unlinked.join(", ")}` : null,
+      unlinked.length > 0 ? `Aucune option Sendcloud pour : ${unlinked.join(", ")}` : null,
     ].filter(Boolean);
     const message = `${source === "demo" ? "Mode demo : " : ""}${parts.join(". ")}.`;
 
@@ -240,10 +236,10 @@ export const sendcloudRouter = createRouter({
       const creds = await getSendcloudCredentials();
 
       const [order] = await db.select().from(orders).where(eq(orders.id, input.orderId));
-      if (!order) return labelError("Commande introuvable.");
+      if (!order) return parcelFailure("Commande introuvable.");
 
       if (!creds.configured) {
-        return labelError(
+        return parcelFailure(
           "Sendcloud n'est pas configure. Renseignez vos cles API dans Parametres.",
         );
       }
@@ -255,27 +251,7 @@ export const sendcloudRouter = createRouter({
         ? await db.select().from(shippingMethods).where(eq(shippingMethods.id, offerId))
         : [];
       const carrier = offer?.carrier ?? order.shippingCarrier;
-      if (!carrier) return labelError("Aucun transporteur sur cette commande.");
-
-      const { source, error, services } = await loadServices();
-      if (source !== "sendcloud") {
-        return labelError(`Sendcloud injoignable${error ? ` : ${error}` : ""}.`);
-      }
-
-      // Le mode suit la commande : un point relais choisi = service point relais.
-      const servicePoint = Boolean(order.servicePointId);
-      const service = pickSendcloudService(services, {
-        carrier,
-        servicePoint,
-        hints: [...(offer ? offerServiceHints(services, offer) : []), order.shippingMethodName],
-      });
-      if (!service) {
-        return labelError(
-          `Aucun service ${carrierLabel(carrier)} ${
-            servicePoint ? "en point relais" : "a domicile"
-          } n'est active sur votre compte Sendcloud. Activez-le dans Sendcloud, puis reessayez.`,
-        );
-      }
+      if (!carrier) return parcelFailure("Aucun transporteur sur cette commande.");
 
       // Poids reel : somme des poids figes sur les lignes + emballage.
       // On ne retombe sur le poids par defaut que si l'entree l'impose.
@@ -283,13 +259,44 @@ export const sendcloudRouter = createRouter({
       const computedGrams = await parcelWeightGrams(lines);
       const weightKg = input.weight ?? gramsToKg(computedGrams);
 
-      // Sendcloud facture par tranche de poids : on prend celle du colis.
-      const bracket = pickBracket(service, weightKg);
-      if (!bracket) {
-        return labelError(`${service.name} n'accepte pas un colis de ${weightKg.toFixed(2)} kg.`);
+      // Options valables pour CE colis : destination, point relais et poids.
+      const { source, error, services } = await listShippingOptions({
+        toPostalCode: order.postalCode,
+        toCity: order.city,
+        servicePointId: order.servicePointId,
+        weightKg,
+      });
+      if (source !== "sendcloud") {
+        return parcelFailure(`Impossible de lire les options Sendcloud${error ? ` : ${error}` : ""}.`);
       }
 
-      const result = await createParcel({
+      // Le mode suit la commande : un point relais choisi = option point relais.
+      const servicePoint = Boolean(order.servicePointId);
+      const service = pickSendcloudService(services, {
+        carrier,
+        servicePoint,
+        hints: [...(offer ? offerServiceHints(offer) : []), order.shippingMethodName],
+      });
+      if (!service) {
+        return parcelFailure(
+          `Aucune option ${carrierLabel(carrier)} ${
+            servicePoint ? "en point relais" : "a domicile"
+          } n'est disponible sur votre compte Sendcloud pour ce colis (${weightKg.toFixed(2)} kg${
+            servicePoint ? ", ce point relais" : ""
+          }). Verifiez les transporteurs actives dans Sendcloud, puis reessayez.`,
+        );
+      }
+
+      const sender = await resolveSenderAddressId();
+      if (!sender.id) {
+        return parcelFailure(
+          `Aucune adresse d'expedition trouvee sur votre compte Sendcloud${
+            sender.error ? ` (${sender.error})` : ""
+          }. Ajoutez-en une dans Sendcloud ou renseignez son ID dans Parametres.`,
+        );
+      }
+
+      const result = await announceShipment({
         name: [order.firstName, order.lastName].filter(Boolean).join(" ") || order.email,
         address: order.address || "",
         city: order.city || "",
@@ -299,8 +306,9 @@ export const sendcloudRouter = createRouter({
         telephone: order.phone || "",
         orderNumber: order.orderNumber,
         weight: weightKg,
-        shippingMethodId: bracket.id,
+        shippingOptionCode: service.code,
         servicePointId: order.servicePointId,
+        senderAddressId: sender.id,
       });
 
       if (result.ok) {
@@ -314,10 +322,24 @@ export const sendcloudRouter = createRouter({
             status: "shipped",
           })
           .where(eq(orders.id, order.id));
-        return { ...result, message: `${result.message} · ${bracket.name} · ${weightKg.toFixed(2)} kg` };
+        return { ...result, message: `${result.message} · ${service.name} · ${weightKg.toFixed(2)} kg` };
       }
 
       return result;
+    }),
+
+  /** PDF de l'etiquette d'une commande : les liens Sendcloud exigent les cles API. */
+  labelPdf: adminQuery
+    .input(z.object({ orderId: z.number().int() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [order] = await db.select().from(orders).where(eq(orders.id, input.orderId));
+      if (!order?.labelUrl) {
+        return { ok: false as const, message: "Aucune etiquette pour cette commande.", base64: null, filename: null };
+      }
+      const pdf = await fetchLabelPdf(order.labelUrl);
+      if (!pdf.ok) return { ok: false as const, message: pdf.error, base64: null, filename: null };
+      return { ok: true as const, message: null, base64: pdf.base64, filename: `etiquette-${order.orderNumber}.pdf` };
     }),
 
   tracking: publicQuery

@@ -34,40 +34,50 @@ Les gabarits d'emails peuvent aussi etre crees depuis le CRM :
 | --- | --- | --- |
 | Public Key | `sendcloud_public_key` | `SENDCLOUD_PUBLIC_KEY` |
 | Secret Key | `sendcloud_secret_key` | `SENDCLOUD_SECRET_KEY` |
-| ID adresse d'expedition | `sendcloud_sender_address_id` | `SENDCLOUD_SENDER_ADDRESS_ID` |
+| ID adresse d'expedition (facultatif) | `sendcloud_sender_address_id` | `SENDCLOUD_SENDER_ADDRESS_ID` |
 | Poids par defaut (kg) | `sendcloud_default_weight` | `SENDCLOUD_DEFAULT_WEIGHT` |
+
+Les options d'expedition et la creation des colis passent par l'**API v3**
+de Sendcloud : la creation de colis en v2 est fermee aux comptes ouverts
+depuis avril 2026 (« Creating parcels via API v2 is not available for this
+account »). La recherche de points relais et le suivi restent en v2, toujours
+ouverte.
+
+Sans ID d'adresse d'expedition, l'etiquette part de la premiere adresse
+francaise du compte Sendcloud (Sendcloud > Parametres > Adresses).
 
 1. Renseigner les cles, puis **Tester la connexion**.
 2. Aller dans **Admin > Livraison** et cliquer **Synchroniser depuis Sendcloud** :
-   chaque offre du CRM est reliee au service Sendcloud correspondant (meme
+   chaque offre du CRM est reliee a l'option Sendcloud correspondante (meme
    transporteur, meme mode domicile / point relais). La colonne « Sendcloud »
-   indique le service retenu, ou « Aucun service » si le compte Sendcloud n'en
+   indique l'option retenue, ou « Aucune option » si le compte Sendcloud n'en
    propose pas (les etiquettes seront alors refusees pour cette offre).
    Sans aucune offre en base, la synchronisation en cree une par transporteur
    et par mode.
 3. Les offres marquees « Point relais » declenchent le selecteur de point
    relais dans le tunnel de commande.
 4. Depuis **Admin > Commandes**, deplier une commande puis
-   **Creer l'etiquette Sendcloud** : le colis est cree, le numero de suivi et
-   l'etiquette PDF sont enregistres et la commande passe en « Expedie »
-   (ce qui declenche l'email d'expedition).
+   **Creer l'etiquette Sendcloud** : Sendcloud cherche les options valables
+   pour ce colis (destination, point relais choisi, poids reel), le colis est
+   annonce avec celle de l'offre, puis le numero de suivi et l'etiquette sont
+   enregistres et la commande passe en « Expedie » (ce qui declenche l'email
+   d'expedition). **Telecharger l'etiquette** recupere le PDF via le serveur :
+   les liens Sendcloud exigent les cles API.
 
-### Offres et tranches de poids
+### Offres et options Sendcloud
 
-Sendcloud decoupe chaque service en une methode par tranche de poids
-(« Colissimo Home 0.5-0.75kg », « Colissimo Home 0.75-1kg »...), sans prix
-client. Ces tranches ne sont **jamais** proposees au client : une ligne de
-**Admin > Livraison** est une offre (« Mondial Relay Point Relais »), et la
-tranche Sendcloud est choisie a la creation de l'etiquette d'apres le poids
-reel du colis.
+Une ligne de **Admin > Livraison** est une offre telle que le client la voit
+(« Mondial Relay Point Relais »). Elle est reliee a une option d'expedition
+Sendcloud, qui couvre toutes les tranches de poids : Sendcloud facture
+lui-meme le tarif du poids declare sur l'etiquette.
 
-Le service est choisi automatiquement (le plus standard : sans signature, QR
-code ni consigne). On peut en imposer un autre dans la fiche de l'offre
-(« Service Sendcloud »), par exemple « Mondial Relay Point Relais QR ».
+L'option est choisie automatiquement (la plus standard : sans signature, QR
+code, consigne ni retour). On peut en imposer une autre dans la fiche de
+l'offre (« Option Sendcloud »), par exemple « Mondial Relay Point Relais QR ».
 
-Les anciennes versions importaient une ligne par tranche de poids, a 0 € :
-la synchronisation les supprime (le CRM affiche un avertissement tant qu'il en
-reste).
+Les anciennes versions (API v2) importaient une ligne par tranche de poids, a
+0 € : la synchronisation les supprime (le CRM affiche un avertissement tant
+qu'il en reste).
 
 Sans cles : methodes et points relais de demonstration, generation d'etiquette
 refusee avec un message explicite.
@@ -86,12 +96,12 @@ Ce poids sert a deux choses :
    0.5 kg : 4.50 €, jusqu'a 1 kg : 5.50 €, jusqu'a 2 kg : 6.90 €. Le prix
    affiche au checkout et facture a la commande est celui de la tranche du
    colis ; au-dela de la derniere tranche, son prix s'applique. Sans grille,
-   l'offre garde un prix unique. Si Sendcloud communique ses tarifs, le bouton
-   « Reprendre les tarifs Sendcloud » pre-remplit la grille. Une offre n'est
-   masquee que si le colis depasse le poids maximal de son service Sendcloud.
-2. **Choisir la tranche Sendcloud et declarer le poids exact du colis** a la
-   creation de l'etiquette, ce qui evite les regularisations de facturation du
-   transporteur.
+   l'offre garde un prix unique. Le bouton « Reprendre les tarifs Sendcloud »
+   releve le cout Sendcloud de l'option a plusieurs poids (0,25 a 30 kg) et
+   pre-remplit la grille, a ajuster ensuite. Une offre n'est masquee que si le
+   colis depasse le poids maximal de son option Sendcloud.
+2. **Declarer le poids exact du colis** a la creation de l'etiquette, ce qui
+   evite les regularisations de facturation du transporteur.
 
 Le poids est fige sur la ligne de commande au moment de l'achat, comme le
 prix : modifier ou supprimer un produit ensuite ne change pas les commandes
