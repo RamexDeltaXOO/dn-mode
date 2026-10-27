@@ -16,6 +16,7 @@ import { collections, products } from "@db/schema";
 import { getDb } from "../queries/connection";
 import { getConfigValue } from "./site-config";
 import { originFromRequest } from "./request-origin";
+import { findProductBySlug } from "./product-slugs";
 
 /**
  * Referencement de la boutique.
@@ -78,6 +79,8 @@ type JsonLd = Record<string, unknown>;
 
 export type PageMeta = {
   status: 200 | 404 | 503;
+  /** Adresse definitive de la page (ancien slug) : redirection 301. */
+  redirect?: string;
   title: string;
   description: string;
   /** Chemin canonique, sans domaine ni parametres. */
@@ -259,7 +262,7 @@ async function collectionPage(slug: string, settings: SeoSettings): Promise<Page
 
 async function productPage(slug: string, settings: SeoSettings): Promise<PageMeta> {
   const db = getDb();
-  const [product] = await db.select().from(products).where(eq(products.slug, slug)).limit(1);
+  const product = await findProductBySlug(slug);
   // Un produit desactive dans le CRM sort des resultats de recherche.
   if (!product || product.isActive === false) return notFoundPage(`/products/${slug}`, settings);
 
@@ -273,6 +276,9 @@ async function productPage(slug: string, settings: SeoSettings): Promise<PageMet
 
   const seo = productSeo(product, settings.siteName);
   const path = `/products/${product.slug}`;
+  // Ancien slug (accents, majuscules) : Google et les liens partages suivent
+  // la redirection vers l'adresse corrigee.
+  const redirect = product.slug !== slug ? encodeURI(path) : undefined;
   const url = absoluteUrl(settings.baseUrl, path);
   const images = (product.images ?? []).filter(Boolean).map((i) => absoluteUrl(settings.baseUrl, i));
   const price = Number.parseFloat(String(product.price)).toFixed(2);
@@ -283,6 +289,7 @@ async function productPage(slug: string, settings: SeoSettings): Promise<PageMet
 
   return {
     status: 200,
+    redirect,
     ...seo,
     path,
     noindex: false,
@@ -440,6 +447,7 @@ export function injectPageMeta(html: string, page: PageMeta, settings: SeoSettin
 export async function renderAppHtml(c: Context, html: string): Promise<Response> {
   const settings = await getSeoSettings(c.req.raw);
   const page = await resolvePageMeta(new URL(c.req.url).pathname, settings);
+  if (page.redirect) return c.redirect(page.redirect, 301);
   return c.html(injectPageMeta(html, page, settings), page.status);
 }
 

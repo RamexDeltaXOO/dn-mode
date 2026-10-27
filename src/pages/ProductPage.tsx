@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router";
+import { useParams, Link, useNavigate } from "react-router";
 import { Shipping, stockFor } from "@contracts/constants";
 import { trpc } from "@/providers/trpc";
 import { ChevronLeft, ShoppingBag, Check } from "lucide-react";
@@ -19,6 +19,14 @@ export default function ProductPage() {
     { slug: slug || "" },
     { enabled: !!slug }
   );
+
+  // Ancien slug (accents, majuscules) : on affiche l'adresse corrigee.
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (product && slug && product.slug !== slug) {
+      navigate(`/products/${product.slug}`, { replace: true });
+    }
+  }, [product, slug, navigate]);
 
   // Seuil de livraison offerte pilote depuis le CRM (100€ par defaut).
   const { data: shippingSettings } = trpc.shipping.settings.useQuery(undefined, {

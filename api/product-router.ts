@@ -4,6 +4,7 @@ import { eq, ne, like, and, sql, inArray } from "drizzle-orm";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { affectedRows, bulkIdsInput } from "./lib/bulk";
+import { findProductBySlug, productSlug } from "./lib/product-slugs";
 import { products } from "@db/schema";
 
 /** Refuse un slug deja pris, avec un message clair plutot qu'une erreur MySQL. */
@@ -93,8 +94,7 @@ export const productRouter = createRouter({
   getBySlug: publicQuery
     .input(z.object({ slug: z.string().max(255) }))
     .query(async ({ ctx, input }) => {
-      const db = getDb();
-      const [product] = await db.select().from(products).where(eq(products.slug, input.slug));
+      const product = await findProductBySlug(input.slug);
       return visibleTo(product, ctx.user?.role);
     }),
 
@@ -126,10 +126,13 @@ export const productRouter = createRouter({
       isFeatured: z.boolean().optional(),
     }))
     .mutation(async ({ input }) => {
-      await assertSlugAvailable(input.slug);
+      // Slug toujours normalise, meme saisi a la main : minuscules, sans accents.
+      const slug = productSlug(input.slug, input.name);
+      await assertSlugAvailable(slug);
       const db = getDb();
       const data = {
         ...input,
+        slug,
         price: String(input.price),
         compareAtPrice: input.compareAtPrice ? String(input.compareAtPrice) : undefined,
       };
@@ -158,10 +161,19 @@ export const productRouter = createRouter({
       isFeatured: z.boolean().optional(),
     }))
     .mutation(async ({ input }) => {
-      if (input.slug !== undefined) await assertSlugAvailable(input.slug, input.id);
       const db = getDb();
       const { id, ...raw } = input;
       const data: Record<string, unknown> = { ...raw };
+      if (input.slug !== undefined) {
+        // Slug vide : celui du nom (nouveau ou actuel).
+        let name = input.name;
+        if (name === undefined) {
+          const [current] = await db.select({ name: products.name }).from(products).where(eq(products.id, id));
+          name = current?.name ?? "";
+        }
+        data.slug = productSlug(input.slug, name, id);
+        await assertSlugAvailable(data.slug as string, id);
+      }
       if (data.price !== undefined) data.price = String(data.price);
       if (data.compareAtPrice !== undefined && data.compareAtPrice !== null) {
         data.compareAtPrice = String(data.compareAtPrice);

@@ -296,6 +296,16 @@ dans `api/lib/ensure-schema.ts` (aujourd'hui `weight_grams` sur `products` et
 `order_items`) sont ajoutees par le serveur lui-meme au demarrage s'il en
 manque une. Ce mecanisme ne fait que des ajouts, jamais de suppression.
 
+**Slugs produits.** Un slug est toujours en minuscules, sans accents ni
+caracteres speciaux (« Robe Été & Cœur » -> `robe-ete-et-coeur`) : le serveur
+le normalise a chaque creation ou modification dans le CRM, et un slug vide
+reprend le nom du produit. A chaque demarrage du serveur (donc a chaque
+deploiement), les slugs qui ne respectent pas cette regle sont corriges en
+base, avec un suffixe `-2`, `-3`... si le slug corrige est deja pris ; les
+corrections apparaissent dans les journaux (`[slugs] produit 12 : "Robe Été"
+-> "robe-ete"`). Les anciennes adresses restent valides : `/products/Robe-Été`
+redirige (301) vers `/products/robe-ete`.
+
 Les categories ont ete retirees du projet au profit des seules collections. La
 table `categories` et la colonne `products.categoryId` restent en base sans
 etre utilisees ; un prochain `db:push` proposera de les supprimer, ce qui est

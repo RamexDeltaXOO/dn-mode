@@ -10,6 +10,7 @@ import { env } from "./lib/env";
 import { createGoogleCallbackHandler } from "./lib/google-oauth";
 import { createImageHandler, createUploadHandler } from "./lib/storage";
 import { ensureSchema } from "./lib/ensure-schema";
+import { normalizeProductSlugs } from "./lib/product-slugs";
 import { createStripeWebhookHandler } from "./lib/stripe-webhook";
 import { createRobotsHandler, createSitemapHandler } from "./lib/seo";
 import { Paths } from "@contracts/constants";
@@ -58,7 +59,15 @@ if (env.isProduction) {
   serveStaticFiles(app);
 
   // Sans attendre : une base lente ne doit pas retarder le demarrage.
-  ensureSchema().catch((err) => console.error("[schema]", err));
+  // A chaque demarrage (donc a chaque deploiement), les slugs produits
+  // invalides (majuscules, accents...) sont corriges en base.
+  ensureSchema()
+    .catch((err) => console.error("[schema]", err))
+    .then(() => normalizeProductSlugs())
+    .then((fixes) => {
+      for (const fix of fixes) console.log(`[slugs] produit ${fix.id} : "${fix.from}" -> "${fix.to}"`);
+    })
+    .catch((err) => console.error("[slugs]", err));
 
   const port = parseInt(process.env.PORT || "3000");
   serve({ fetch: app.fetch, port }, () => {

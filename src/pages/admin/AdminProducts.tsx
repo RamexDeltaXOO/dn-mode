@@ -221,7 +221,9 @@ export default function AdminProducts() {
                   <input
                     value={form.slug}
                     onChange={(e) => setForm({ ...form, slug: e.target.value })}
-                    placeholder="auto-genere"
+                    // Le serveur normalise aussi : minuscules, sans accents ni caracteres speciaux.
+                    onBlur={() => setForm((current) => ({ ...current, slug: slugify(current.slug) }))}
+                    placeholder={slugify(form.name) || "auto-genere"}
                     className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222]"
                   />
                 </div>

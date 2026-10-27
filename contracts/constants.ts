@@ -215,11 +215,27 @@ export function stockFor(
 }
 
 /** Slug d'URL : "T-shirts / Tops été" -> "t-shirts-tops-ete". */
+/** Lettres que la decomposition Unicode ne ramene pas a l'ASCII. */
+const SPECIAL_LETTERS: Record<string, string> = {
+  \u0153: "oe", \u00e6: "ae", \u00df: "ss", \u00f8: "o", \u0142: "l", \u0111: "d", \u00f0: "d", \u00fe: "th", \u0131: "i",
+};
+
+/** Longueur maximale d'un slug (la colonne en accepte 255). */
+export const SLUG_MAX_LENGTH = 200;
+
+/**
+ * "Robe \u00c9t\u00e9 & C\u0153ur" -> "robe-ete-et-coeur" : minuscules, sans accents ni
+ * caracteres speciaux, mots separes par des tirets.
+ */
 export function slugify(value: string): string {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
+    .replace(/[\u0153\u00e6\u00df\u00f8\u0142\u0111\u00f0\u00fe\u0131]/g, (letter) => SPECIAL_LETTERS[letter])
+    .replace(/&/g, " et ")
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/^-+|-+$/g, "")
+    .slice(0, SLUG_MAX_LENGTH)
+    .replace(/-+$/, "");
 }
