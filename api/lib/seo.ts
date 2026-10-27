@@ -34,7 +34,7 @@ import { originFromRequest } from "./request-origin";
 export type SeoSettings = {
   siteName: string;
   description: string;
-  /** Origine publique sans "/" final : https://dnmode.fr */
+  /** Origine publique sans "/" final : https://dn-mode.com */
   baseUrl: string;
   instagramUrl: string;
   heroImage: string;
@@ -45,7 +45,7 @@ export async function getSeoSettings(req: Request): Promise<SeoSettings> {
     getConfigValue(ConfigKeys.siteName, { fallback: SeoDefaults.siteName }),
     getConfigValue(ConfigKeys.siteDescription, { fallback: SeoDefaults.description }),
     // Domaine officiel d'abord : une page ouverte via l'adresse technique
-    // d'App Hosting doit quand meme designer dnmode.fr comme canonique.
+    // d'App Hosting doit quand meme designer dn-mode.com comme canonique.
     getConfigValue(ConfigKeys.siteUrl, { envKey: "PUBLIC_APP_URL" }),
     getConfigValue(ConfigKeys.instagramUrl),
     getConfigValue(ConfigKeys.homeHeroImage, { fallback: HomeImageDefaults.hero }),

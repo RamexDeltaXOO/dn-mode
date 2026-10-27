@@ -175,7 +175,7 @@ Supprimer le `.env` ensuite : `rm .env`.
 Se connecter sur `https://<ton-url>/login` avec le compte admin, puis ouvrir
 **Admin > Parametres**. Tout se saisit ici, rien a redeployer.
 
-**Site web** : nom, URL du site (`https://dnmode.fr`), description affichee
+**Site web** : nom, URL du site (`https://dn-mode.com`), description affichee
 dans Google, email de contact, seuil de livraison offerte (100€ par defaut,
 France metropolitaine).
 
@@ -221,7 +221,7 @@ pas duplique.
 ## Etape 8 : Domaine personnalise
 
 Console Firebase > App Hosting > ton backend > **Domaines personnalises**,
-ajouter `dnmode.fr`, puis creer les enregistrements DNS indiques chez ton
+ajouter `dn-mode.com`, puis creer les enregistrements DNS indiques chez ton
 registrar. Le certificat TLS est emis automatiquement (compter jusqu'a 24 h).
 
 Ensuite, deux choses a reprendre :
@@ -232,8 +232,8 @@ Ensuite, deux choses a reprendre :
   officielle pour Google.
 
 Puis declarer le site a Google : [Google Search Console](https://search.google.com/search-console),
-ajouter la propriete `dnmode.fr` (verification par enregistrement DNS), puis
-**Sitemaps** > envoyer `https://dnmode.fr/sitemap.xml`. Le detail est dans
+ajouter la propriete `dn-mode.com` (verification par enregistrement DNS), puis
+**Sitemaps** > envoyer `https://dn-mode.com/sitemap.xml`. Le detail est dans
 `docs/INTEGRATIONS.md`, section Referencement.
 
 ---
@@ -251,7 +251,7 @@ ajouter la propriete `dnmode.fr` (verification par enregistrement DNS), puis
 - [ ] Le formulaire de contact declenche l'accuse de reception, et une reponse
       depuis Admin > Messages arrive bien
 - [ ] Connexion Gmail fonctionnelle (si configuree)
-- [ ] `https://dnmode.fr/sitemap.xml` liste les produits, et le
+- [ ] `https://dn-mode.com/sitemap.xml` liste les produits, et le
       [test des resultats enrichis](https://search.google.com/test/rich-results)
       reconnait la fiche produit (prix, disponibilite) sur une page article
 

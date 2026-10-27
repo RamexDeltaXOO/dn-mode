@@ -248,8 +248,8 @@ canonique a jour quand on change de page sans recharger.
 ### A faire une fois en ligne
 
 1. [Google Search Console](https://search.google.com/search-console) :
-   ajouter `dnmode.fr`, verifier par DNS, puis **Sitemaps** > envoyer
-   `https://dnmode.fr/sitemap.xml`.
+   ajouter `dn-mode.com`, verifier par DNS, puis **Sitemaps** > envoyer
+   `https://dn-mode.com/sitemap.xml`.
 2. Bing Webmaster Tools : importer le site depuis Search Console.
 3. Pour chaque produit, remplir la **description courte** (une phrase, 160
    caracteres max) : c'est le texte affiche sous le titre dans Google.

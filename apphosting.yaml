@@ -44,9 +44,9 @@ env:
     availability:
       - RUNTIME
 
-  # ── URL publique, utilisee dans les liens des emails ──
+  # ── URL publique : liens des emails, balises canoniques, sitemap ──
   - variable: PUBLIC_APP_URL
-    value: https://dnmode.fr
+    value: https://dn-mode.com
     availability:
       - RUNTIME
 

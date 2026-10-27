@@ -21,13 +21,13 @@ import {
 /** Valeurs de demonstration pour l'apercu dans le CRM. */
 const PREVIEW_SAMPLES: Record<string, string> = {
   shopName: "DN MODE",
-  shopUrl: "https://dnmode.fr",
-  logoUrl: "https://dnmode.fr/logo-dnmode.png",
+  shopUrl: "https://dn-mode.com",
+  logoUrl: "https://dn-mode.com/logo-dnmode.png",
   supportEmail: "sav@dnmode.fr",
-  supportUrl: "https://dnmode.fr/contact",
+  supportUrl: "https://dn-mode.com/contact",
   orderNumber: "DNM-20260811-A1B2C",
   orderDate: "11/08/2026",
-  orderUrl: "https://dnmode.fr/checkout",
+  orderUrl: "https://dn-mode.com/checkout",
   firstName: "Amina",
   lastName: "Benali",
   name: "Amina Benali",

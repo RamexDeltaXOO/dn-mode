@@ -46,7 +46,7 @@ export async function resolveShopUrl(req?: Request): Promise<string> {
   const configured = (
     await getConfigValue(ConfigKeys.siteUrl, {
       envKey: "PUBLIC_APP_URL",
-      fallback: "https://dnmode.fr",
+      fallback: "https://dn-mode.com",
     })
   ).replace(/\/+$/, "");
   if (!req) return configured;

@@ -254,11 +254,11 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
             <SectionHeader icon={Globe} title="Site Web" />
             <div className="space-y-4">
               <Field label="Nom du site" value={form.site_name} onChange={(v) => setForm({ ...form, site_name: v })} placeholder="DN MODE" />
-              <Field label="URL du site" value={form.site_url} onChange={(v) => setForm({ ...form, site_url: v.trim() })} placeholder="https://dnmode.fr" />
+              <Field label="URL du site" value={form.site_url} onChange={(v) => setForm({ ...form, site_url: v.trim() })} placeholder="https://dn-mode.com" />
               <Field label="Description (Google)" value={form.site_description} onChange={(v) => setForm({ ...form, site_description: v })} placeholder="Texte affiche sous le nom du site dans Google, 160 caracteres max" />
               <p className="text-[0.6875rem] text-[#999999]">
                 L&apos;URL du site sert d&apos;adresse officielle pour Google et le sitemap
-                ({form.site_url || "https://dnmode.fr"}/sitemap.xml, a declarer dans Google Search
+                ({form.site_url || "https://dn-mode.com"}/sitemap.xml, a declarer dans Google Search
                 Console). Laissez-la vide pour utiliser celle definie au deploiement.
               </p>
               <Field label="Email de contact" value={form.contact_email} onChange={(v) => setForm({ ...form, contact_email: v })} placeholder="contact@dnmode.fr" />
@@ -477,7 +477,7 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
               </div>
               <Field label="Access Key" value={form.storage_access_key} onChange={(v) => setForm({ ...form, storage_access_key: v })} placeholder="GOOG1E..." />
               <Field label="Secret Key" value={form.storage_secret_key} onChange={(v) => setForm({ ...form, storage_secret_key: v })} type="password" placeholder="..." />
-              <Field label="URL publique (optionnel)" value={form.storage_public_url} onChange={(v) => setForm({ ...form, storage_public_url: v })} placeholder="https://images.dnmode.fr" />
+              <Field label="URL publique (optionnel)" value={form.storage_public_url} onChange={(v) => setForm({ ...form, storage_public_url: v })} placeholder="https://images.dn-mode.com" />
               <p className="text-[0.6875rem] text-[#999999]">
                 Rien a configurer : tant que ces champs sont vides, les photos envoyees depuis le
                 CRM sont enregistrees dans la base de donnees de la boutique, ce qui suffit pour
