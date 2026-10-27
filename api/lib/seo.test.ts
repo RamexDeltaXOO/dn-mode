@@ -12,7 +12,7 @@ import {
 const settings: SeoSettings = {
   siteName: "DN MODE",
   description: "Boutique de mode",
-  baseUrl: "https://dnmode.fr",
+  baseUrl: "https://dn-mode.com",
   instagramUrl: "",
   heroImage: "/hero-bg.jpg",
 };
@@ -74,7 +74,7 @@ describe("balises injectees dans index.html", () => {
     const html = injectPageMeta(INDEX_HTML, page(), settings);
     expect(html).toContain("<title>Robe AMINA | DN MODE</title>");
     expect(html).not.toContain("<title>DN MODE</title>");
-    expect(html).toContain('<link rel="canonical" href="https://dnmode.fr/products/robe-amina" />');
+    expect(html).toContain('<link rel="canonical" href="https://dn-mode.com/products/robe-amina" />');
     expect(html).not.toContain("noindex");
   });
 
@@ -110,8 +110,8 @@ describe("balises injectees dans index.html", () => {
   });
 
   it("garde les URL absolues telles quelles", () => {
-    expect(absoluteUrl("https://dnmode.fr", "/api/images/a.webp")).toBe("https://dnmode.fr/api/images/a.webp");
-    expect(absoluteUrl("https://dnmode.fr", "https://cdn.test/a.jpg")).toBe("https://cdn.test/a.jpg");
+    expect(absoluteUrl("https://dn-mode.com", "/api/images/a.webp")).toBe("https://dn-mode.com/api/images/a.webp");
+    expect(absoluteUrl("https://dn-mode.com", "https://cdn.test/a.jpg")).toBe("https://cdn.test/a.jpg");
   });
 });
 
@@ -130,12 +130,12 @@ describe("routage SEO sans base", () => {
 
 describe("sitemap", () => {
   it("liste les pages avec leurs images et echappe les URL", () => {
-    const xml = buildSitemap("https://dnmode.fr", [
+    const xml = buildSitemap("https://dn-mode.com", [
       { path: "/" },
       { path: "/products/robe", lastmod: new Date("2026-10-01T12:00:00Z"), images: ["/api/images/a.webp?x=1&y=2"] },
     ]);
-    expect(xml).toContain("<loc>https://dnmode.fr/</loc>");
+    expect(xml).toContain("<loc>https://dn-mode.com/</loc>");
     expect(xml).toContain("<lastmod>2026-10-01</lastmod>");
-    expect(xml).toContain("<image:loc>https://dnmode.fr/api/images/a.webp?x=1&amp;y=2</image:loc>");
+    expect(xml).toContain("<image:loc>https://dn-mode.com/api/images/a.webp?x=1&amp;y=2</image:loc>");
   });
 });

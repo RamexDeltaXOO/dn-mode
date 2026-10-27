@@ -165,7 +165,7 @@ describe("annonce d'un colis (API v3)", () => {
       postal_code: "93200",
       city: "Saint-Denis",
       country_code: "FR",
-      email: "contact@dnmode.fr",
+      email: "contact@dn-mode.com",
       phone_number: "",
     };
     const fromAddress = senderAsCompany(address)!;
@@ -176,7 +176,7 @@ describe("annonce d'un colis (API v3)", () => {
       postal_code: "93200",
       city: "Saint-Denis",
       country_code: "FR",
-      email: "contact@dnmode.fr",
+      email: "contact@dn-mode.com",
     });
     expect(fromAddress.company_name).toBeUndefined();
 

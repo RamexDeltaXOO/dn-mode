@@ -261,7 +261,7 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
                 ({form.site_url || "https://dn-mode.com"}/sitemap.xml, a declarer dans Google Search
                 Console). Laissez-la vide pour utiliser celle definie au deploiement.
               </p>
-              <Field label="Email de contact" value={form.contact_email} onChange={(v) => setForm({ ...form, contact_email: v })} placeholder="contact@dnmode.fr" />
+              <Field label="Email de contact" value={form.contact_email} onChange={(v) => setForm({ ...form, contact_email: v })} placeholder="contact@dn-mode.com" />
               <Field label="URL Instagram" value={form.instagram_url} onChange={(v) => setForm({ ...form, instagram_url: v })} placeholder="https://instagram.com/..." />
               <div className="grid grid-cols-3 gap-4">
                 <Field label="Seuil livraison offerte (€)" value={form.shipping_threshold} onChange={(v) => setForm({ ...form, shipping_threshold: v })} placeholder="100" />
@@ -501,8 +501,8 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
             <div className="space-y-4">
               <Field label="Resend API Key" value={form.resend_api_key} onChange={(v) => setForm({ ...form, resend_api_key: v })} type="password" placeholder="re_..." />
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Email expediteur" value={form.from_email} onChange={(v) => setForm({ ...form, from_email: v })} placeholder="DN MODE <contact@dnmode.fr>" />
-                <Field label="Email SAV" value={form.support_email} onChange={(v) => setForm({ ...form, support_email: v })} placeholder="sav@dnmode.fr" />
+                <Field label="Email expediteur" value={form.from_email} onChange={(v) => setForm({ ...form, from_email: v })} placeholder="DN MODE <contact@dn-mode.com>" />
+                <Field label="Email SAV" value={form.support_email} onChange={(v) => setForm({ ...form, support_email: v })} placeholder="sav@dn-mode.com" />
               </div>
               <div className="flex gap-2 flex-wrap items-center">
                 <button onClick={() => handleSave("resend_api_key", form.resend_api_key)} className="text-[0.625rem] uppercase tracking-[1px] border border-[#e0e0e0] px-3 py-1.5 hover:border-[#222222]">

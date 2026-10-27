@@ -31,14 +31,14 @@ export async function getResendApiKey(): Promise<string> {
 export async function getFromEmail(): Promise<string> {
   return getConfigValue(ConfigKeys.fromEmail, {
     envKey: "FROM_EMAIL",
-    fallback: "DN MODE <contact@dnmode.fr>",
+    fallback: "DN MODE <contact@dn-mode.com>",
   });
 }
 
 export async function getSupportEmail(): Promise<string> {
   const support = await getConfigValue(ConfigKeys.supportEmail, { envKey: "SUPPORT_EMAIL" });
   if (support) return support;
-  return getConfigValue(ConfigKeys.contactEmail, { fallback: "sav@dnmode.fr" });
+  return getConfigValue(ConfigKeys.contactEmail, { fallback: "sav@dn-mode.com" });
 }
 
 /**

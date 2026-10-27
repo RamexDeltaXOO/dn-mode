@@ -156,7 +156,7 @@ npm run db:push      # cree les tables
 npm run db:seed      # collections, produits, 3 modes de livraison,
                      # gabarits d'emails, config par defaut (seuil 100€)
 
-ADMIN_EMAIL=vous@dnmode.fr ADMIN_PASSWORD='un-mot-de-passe-long-et-unique' \
+ADMIN_EMAIL=vous@dn-mode.com ADMIN_PASSWORD='un-mot-de-passe-long-et-unique' \
   npm run admin:create
 ```
 

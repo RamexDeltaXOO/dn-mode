@@ -6,7 +6,7 @@ describe("gabarits d'emails", () => {
   const vars = {
     firstName: '<a href="https://pirate.test">Payez ici</a>',
     itemsHtml: "<table><tr><td>Robe</td></tr></table>",
-    shopUrl: "https://dnmode.fr/?a=1&b=2",
+    shopUrl: "https://dn-mode.com/?a=1&b=2",
   };
 
   it("echappe les valeurs saisies par les visiteurs dans le HTML", () => {

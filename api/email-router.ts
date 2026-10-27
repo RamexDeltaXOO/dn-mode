@@ -23,7 +23,7 @@ const PREVIEW_SAMPLES: Record<string, string> = {
   shopName: "DN MODE",
   shopUrl: "https://dn-mode.com",
   logoUrl: "https://dn-mode.com/logo-dnmode.png",
-  supportEmail: "sav@dnmode.fr",
+  supportEmail: "sav@dn-mode.com",
   supportUrl: "https://dn-mode.com/contact",
   orderNumber: "DNM-20260811-A1B2C",
   orderDate: "11/08/2026",
