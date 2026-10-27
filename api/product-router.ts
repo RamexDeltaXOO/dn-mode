@@ -4,7 +4,7 @@ import { eq, ne, like, and, sql, inArray } from "drizzle-orm";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { affectedRows, bulkIdsInput } from "./lib/bulk";
-import { findProductBySlug, productSlug } from "./lib/product-slugs";
+import { findProductBySlug, productSlug } from "./lib/slugs";
 import { products } from "@db/schema";
 
 /** Refuse un slug deja pris, avec un message clair plutot qu'une erreur MySQL. */

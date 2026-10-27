@@ -1,9 +1,32 @@
 import { z } from "zod";
-import { eq, inArray } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { affectedRows, bulkIdsInput } from "./lib/bulk";
+import { RESERVED_COLLECTION_SLUGS, collectionSlug, findCollectionBySlug } from "./lib/slugs";
 import { collections } from "@db/schema";
+
+/** Refuse un slug reserve ou deja pris, avec un message clair plutot qu'une erreur MySQL. */
+async function assertSlugAvailable(slug: string, exceptId?: number): Promise<void> {
+  if (RESERVED_COLLECTION_SLUGS.includes(slug)) {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: `Le slug « ${slug} » est reserve a « Tous les articles ». Choisissez-en un autre.`,
+    });
+  }
+  const db = getDb();
+  const condition = exceptId === undefined
+    ? eq(collections.slug, slug)
+    : and(eq(collections.slug, slug), ne(collections.id, exceptId));
+  const [existing] = await db.select({ name: collections.name }).from(collections).where(condition);
+  if (existing) {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: `Le slug « ${slug} » est deja utilise par la collection « ${existing.name} ». Choisissez-en un autre.`,
+    });
+  }
+}
 
 export const collectionRouter = createRouter({
   list: publicQuery.query(async () => {
@@ -14,9 +37,7 @@ export const collectionRouter = createRouter({
   getBySlug: publicQuery
     .input(z.object({ slug: z.string() }))
     .query(async ({ input }) => {
-      const db = getDb();
-      const [collection] = await db.select().from(collections).where(eq(collections.slug, input.slug));
-      return collection || null;
+      return (await findCollectionBySlug(input.slug)) ?? null;
     }),
 
   create: adminQuery
@@ -28,10 +49,13 @@ export const collectionRouter = createRouter({
       sortOrder: z.number().optional(),
     }))
     .mutation(async ({ input }) => {
+      // Slug toujours normalise, meme saisi a la main : minuscules, sans accents.
+      const slug = collectionSlug(input.slug, input.name);
+      await assertSlugAvailable(slug);
       const db = getDb();
-      const result = await db.insert(collections).values(input);
+      const result = await db.insert(collections).values({ ...input, slug });
       const id = Number((result as any)[0].insertId);
-      return { id, ...input };
+      return { id, ...input, slug };
     }),
 
   update: adminQuery
@@ -46,6 +70,16 @@ export const collectionRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = getDb();
       const { id, ...data } = input;
+      if (input.slug !== undefined) {
+        // Slug vide : celui du nom (nouveau ou actuel).
+        let name = input.name;
+        if (name === undefined) {
+          const [current] = await db.select({ name: collections.name }).from(collections).where(eq(collections.id, id));
+          name = current?.name ?? "";
+        }
+        data.slug = collectionSlug(input.slug, name, id);
+        await assertSlugAvailable(data.slug, id);
+      }
       await db.update(collections).set(data).where(eq(collections.id, id));
       return { success: true };
     }),

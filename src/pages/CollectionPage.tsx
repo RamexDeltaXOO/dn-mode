@@ -1,8 +1,9 @@
-import { useParams, Link } from "react-router";
+import { useParams, Link, useNavigate } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { useEffect, useMemo, useRef } from "react";
 import gsap from "gsap";
 import { collectionSeo, pageTitle } from "@contracts/seo";
+import { slugify } from "@contracts/constants";
 import { useSeo } from "@/hooks/useSeo";
 import PageLoader from "@/components/PageLoader";
 
@@ -13,7 +14,9 @@ export default function CollectionPage() {
   const { data: collections, isLoading: collectionsLoading } = trpc.collection.list.useQuery();
 
   const isAll = !slug || slug === "all";
-  const currentCollection = collections?.find(c => c.slug === slug);
+  // Un ancien slug (accents, majuscules) retrouve sa collection par sa version normalisee.
+  const currentCollection =
+    collections?.find(c => c.slug === slug) ?? collections?.find(c => c.slug === slugify(slug ?? ""));
   const collectionId = currentCollection?.id;
   // Collection supprimee ou renommee dans le CRM : on ne montre pas tout le
   // catalogue sous son nom.
@@ -25,6 +28,14 @@ export default function CollectionPage() {
     collectionId ? { collectionId, page: 1, limit: 100 } : { page: 1, limit: 100 },
     { enabled: isAll || !!collectionId },
   );
+
+  // Ancien slug : on affiche l'adresse corrigee.
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (currentCollection && slug && currentCollection.slug !== slug) {
+      navigate(`/collections/${currentCollection.slug}`, { replace: true });
+    }
+  }, [currentCollection, slug, navigate]);
 
   const products = useMemo(() => (notFound ? [] : productsData?.products ?? []), [notFound, productsData]);
 

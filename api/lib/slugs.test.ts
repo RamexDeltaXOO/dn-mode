@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SLUG_MAX_LENGTH, slugify } from "@contracts/constants";
-import { planSlugFixes, productSlug } from "./product-slugs";
+import { RESERVED_COLLECTION_SLUGS, collectionSlug, planSlugFixes, productSlug } from "./slugs";
 
 describe("slugify", () => {
   it("met en minuscules et retire les accents", () => {
@@ -89,5 +89,32 @@ describe("correction des slugs au demarrage", () => {
     const fixed = rows.map((row) => ({ ...row, slug: fixes.find((f) => f.id === row.id)?.to ?? row.slug }));
     expect(planSlugFixes(fixed)).toEqual([]);
     expect(new Set(fixed.map((row) => row.slug)).size).toBe(fixed.length);
+  });
+});
+
+describe("slugs des collections", () => {
+  const plan = (rows: Array<{ id: number; slug: string; name: string }>) =>
+    planSlugFixes(rows, (row) => collectionSlug(row.slug, row.name, row.id), RESERVED_COLLECTION_SLUGS);
+
+  it("normalise le slug saisi, sinon prend celui du nom", () => {
+    expect(collectionSlug("T-Shirts & Tops", "x")).toBe("t-shirts-et-tops");
+    expect(collectionSlug("", "Look du Moment")).toBe("look-du-moment");
+    expect(collectionSlug(null, "???", 4)).toBe("collection-4");
+  });
+
+  it("corrige les slugs invalides et garde les autres", () => {
+    expect(plan([
+      { id: 1, slug: "t-shirts-tops", name: "T-shirts & Tops" },
+      { id: 2, slug: "Chemises & Hauts", name: "Chemises" },
+      { id: 3, slug: "Été 2026", name: "Ete" },
+    ])).toEqual([
+      { id: 2, from: "Chemises & Hauts", to: "chemises-et-hauts" },
+      { id: 3, from: "Été 2026", to: "ete-2026" },
+    ]);
+  });
+
+  it("ne laisse jamais une collection prendre « all » (tous les articles)", () => {
+    expect(plan([{ id: 5, slug: "all", name: "All" }])).toEqual([{ id: 5, from: "all", to: "all-2" }]);
+    expect(plan([{ id: 6, slug: "ALL", name: "All" }])).toEqual([{ id: 6, from: "ALL", to: "all-2" }]);
   });
 });

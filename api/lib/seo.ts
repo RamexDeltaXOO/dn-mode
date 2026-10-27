@@ -16,7 +16,7 @@ import { collections, products } from "@db/schema";
 import { getDb } from "../queries/connection";
 import { getConfigValue } from "./site-config";
 import { originFromRequest } from "./request-origin";
-import { findProductBySlug } from "./product-slugs";
+import { findCollectionBySlug, findProductBySlug } from "./slugs";
 
 /**
  * Referencement de la boutique.
@@ -225,9 +225,7 @@ async function homePage(settings: SeoSettings): Promise<PageMeta> {
 async function collectionPage(slug: string, settings: SeoSettings): Promise<PageMeta> {
   const db = getDb();
   const isAll = slug === "all";
-  const [collection] = isAll
-    ? [null]
-    : await db.select().from(collections).where(eq(collections.slug, slug)).limit(1);
+  const collection = isAll ? null : await findCollectionBySlug(slug);
   if (collection === undefined) return notFoundPage(`/collections/${slug}`, settings);
 
   const filter = collection
@@ -244,6 +242,8 @@ async function collectionPage(slug: string, settings: SeoSettings): Promise<Page
   const name = collection?.name ?? "Tous les articles";
   return {
     status: 200,
+    // Ancien slug (accents, majuscules) : redirection vers l'adresse corrigee.
+    redirect: collection && collection.slug !== slug ? encodeURI(path) : undefined,
     ...seo,
     path,
     noindex: false,

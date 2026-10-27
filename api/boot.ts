@@ -10,7 +10,7 @@ import { env } from "./lib/env";
 import { createGoogleCallbackHandler } from "./lib/google-oauth";
 import { createImageHandler, createUploadHandler } from "./lib/storage";
 import { ensureSchema } from "./lib/ensure-schema";
-import { normalizeProductSlugs } from "./lib/product-slugs";
+import { normalizeCollectionSlugs, normalizeProductSlugs } from "./lib/slugs";
 import { createStripeWebhookHandler } from "./lib/stripe-webhook";
 import { createRobotsHandler, createSitemapHandler } from "./lib/seo";
 import { Paths } from "@contracts/constants";
@@ -59,13 +59,17 @@ if (env.isProduction) {
   serveStaticFiles(app);
 
   // Sans attendre : une base lente ne doit pas retarder le demarrage.
-  // A chaque demarrage (donc a chaque deploiement), les slugs produits
-  // invalides (majuscules, accents...) sont corriges en base.
+  // A chaque demarrage (donc a chaque deploiement), les slugs produits et
+  // collections invalides (majuscules, accents...) sont corriges en base.
   ensureSchema()
     .catch((err) => console.error("[schema]", err))
-    .then(() => normalizeProductSlugs())
-    .then((fixes) => {
-      for (const fix of fixes) console.log(`[slugs] produit ${fix.id} : "${fix.from}" -> "${fix.to}"`);
+    .then(async () => {
+      for (const fix of await normalizeProductSlugs()) {
+        console.log(`[slugs] produit ${fix.id} : "${fix.from}" -> "${fix.to}"`);
+      }
+      for (const fix of await normalizeCollectionSlugs()) {
+        console.log(`[slugs] collection ${fix.id} : "${fix.from}" -> "${fix.to}"`);
+      }
     })
     .catch((err) => console.error("[slugs]", err));
 
