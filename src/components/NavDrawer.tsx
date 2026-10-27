@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { X, Instagram } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import { useSiteContent } from "@/hooks/useSiteContent";
+import { useAuth } from "@/hooks/useAuth";
 
 interface NavDrawerProps {
   open: boolean;
@@ -12,6 +13,7 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
   // Collections gerees dans le CRM, dans l'ordre choisi la-bas.
   const { data: collections } = trpc.collection.list.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
   const { instagramUrl } = useSiteContent();
+  const { user, isAuthenticated, logout } = useAuth();
   const navLinks = [
     { name: "Tous les articles", slug: "all" },
     ...(collections ?? []).map((c) => ({ name: c.name, slug: c.slug })),
@@ -59,9 +61,18 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
           </nav>
 
           <div className="pt-6 border-t border-[#f0f0f0]">
-            <Link to="/login" onClick={onClose} className="text-[0.75rem] text-[#666666] hover:text-[#222222]">
-              Se connecter
-            </Link>
+            {isAuthenticated ? (
+              <div className="text-[0.75rem] text-[#666666]">
+                <p className="text-[#222222] truncate">{user?.name || user?.email}</p>
+                <button onClick={logout} className="mt-1 hover:text-[#222222]">
+                  Se deconnecter
+                </button>
+              </div>
+            ) : (
+              <Link to="/login" onClick={onClose} className="text-[0.75rem] text-[#666666] hover:text-[#222222]">
+                Se connecter
+              </Link>
+            )}
             <div className="flex gap-3 mt-4">
               <a href={instagramUrl} target="_blank" rel="noopener noreferrer" className="hover:opacity-60">
                 <Instagram size={18} strokeWidth={1.5} />

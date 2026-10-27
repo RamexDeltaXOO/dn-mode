@@ -59,29 +59,30 @@ export default function Home() {
     }
   }, []);
 
-  // Scroll-triggered animations
+  // Apparition au defilement. Chaque element est observe seul : sur mobile, la
+  // grille de produits (une colonne) est plus haute que l'ecran, et un seuil
+  // calcule sur toute la section n'etait jamais atteint, si bien que les
+  // produits restaient invisibles.
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const el = entry.target;
-            gsap.to(el.querySelectorAll(".animate-in"), {
-              opacity: 1, y: 0, duration: 0.7, stagger: 0.1, ease: "power2.out",
-            });
-            observer.unobserve(el);
-          }
-        });
+        const visible = entries.filter((entry) => entry.isIntersecting).map((entry) => entry.target);
+        if (visible.length === 0) return;
+        gsap.to(visible, { opacity: 1, y: 0, duration: 0.7, stagger: 0.1, ease: "power2.out" });
+        visible.forEach((el) => observer.unobserve(el));
       },
-      { threshold: 0.2 }
+      { threshold: 0.15 }
     );
     [brandRef, productsRef, lookRef].forEach((ref) => {
-      if (ref.current) observer.observe(ref.current);
+      ref.current?.querySelectorAll(".animate-in").forEach((el) => observer.observe(el));
     });
     return () => observer.disconnect();
   }, [featuredProducts, allProducts]);
 
-  const displayProducts = featuredProducts?.products || allProducts?.products || [];
+  // Sans produit mis en avant, on montre les derniers produits plutot qu'une section vide.
+  const displayProducts = featuredProducts?.products?.length
+    ? featuredProducts.products
+    : allProducts?.products || [];
   const productsLoading = !featuredProducts && !allProducts;
 
   return (

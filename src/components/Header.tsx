@@ -36,6 +36,19 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
   const { pathname } = useLocation();
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
 
+  // Menu du compte. L'icone deconnectait d'un seul clic, alors qu'elle est la
+  // meme que "Mon compte" hors connexion : on se deconnectait sans le vouloir.
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!accountOpen) return;
+    const close = (event: PointerEvent) => {
+      if (!accountRef.current?.contains(event.target as Node)) setAccountOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [accountOpen]);
+
   const { data: cartData } = trpc.cart.get.useQuery();
   const cartCount = cartData?.items?.length || 0;
 
@@ -123,11 +136,34 @@ export default function Header({ onCartOpen, onSearchOpen, onNavOpen }: HeaderPr
               </button>
             )}
             {isAuthenticated ? (
-              <div className="flex items-center gap-2">
+              <div ref={accountRef} className="relative flex items-center gap-2">
                 <span className={`text-[0.625rem] hidden sm:inline ${overHero ? "text-white/70" : "text-[#666666]"}`}>{user?.name}</span>
-                <button onClick={logout} className="p-1 hover:opacity-60 transition-opacity" title="Deconnexion">
+                <button
+                  onClick={() => setAccountOpen((open) => !open)}
+                  className="relative p-1 hover:opacity-60 transition-opacity"
+                  aria-label="Mon compte"
+                  aria-haspopup="menu"
+                  aria-expanded={accountOpen}
+                >
                   <User size={20} strokeWidth={1.5} />
+                  {/* Distingue l'icone connectee de celle de connexion. */}
+                  <span aria-hidden="true" className="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-green-600" />
                 </button>
+                {accountOpen && (
+                  <div role="menu" className="absolute right-0 top-full mt-2 w-56 bg-white border border-[#e8e8e8] shadow-lg py-2 text-left">
+                    <div className="px-4 pb-2 mb-1 border-b border-[#f0f0f0]">
+                      <p className="text-[0.8125rem] text-[#222222] truncate">{user?.name || "Mon compte"}</p>
+                      {user?.email && <p className="text-[0.6875rem] text-[#999999] truncate">{user.email}</p>}
+                    </div>
+                    <button
+                      role="menuitem"
+                      onClick={logout}
+                      className="w-full text-left px-4 py-2 text-[0.6875rem] uppercase tracking-[1px] text-[#222222] hover:bg-[#f4f4f4]"
+                    >
+                      Se deconnecter
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <Link to="/login" className="p-1 hover:opacity-60 transition-opacity" aria-label="Mon compte">

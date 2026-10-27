@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { trpc } from "@/providers/trpc";
+import { useAuth } from "@/hooks/useAuth";
 import { LogIn, UserPlus } from "lucide-react";
 import { pageTitle } from "@contracts/seo";
 import { useSeo } from "@/hooks/useSeo";
@@ -50,6 +51,7 @@ export default function Login() {
   useSeo((site) => ({ title: pageTitle("Connexion", site.siteName), noindex: true }));
 
   const utils = trpc.useUtils();
+  const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const { data: googleConfig } = trpc.googleAuth.getConfig.useQuery(undefined, {
     retry: false,
     staleTime: 1000 * 60 * 5,
@@ -102,6 +104,34 @@ export default function Login() {
   };
 
   const isPending = loginMutation.isPending || registerMutation.isPending;
+
+  // Deja connecte ("Mon compte", "Mes commandes") : afficher le compte plutot
+  // qu'un formulaire vide, qui laissait croire a une deconnexion.
+  if (isAuthenticated) {
+    return (
+      <div className="pt-[92px] min-h-[100dvh] flex items-center justify-center bg-[#f4f4f4]">
+        <div className="w-full max-w-[400px] bg-white border border-[#e8e8e8] p-8 text-center">
+          <img src="/logo-dnmode-160.webp" width={160} height={160} alt="DN MODE" className="h-20 w-auto mx-auto mb-4" />
+          <p className="text-[0.8125rem] text-[#666666]">Vous etes connecte(e)</p>
+          <p className="text-[0.9375rem] text-[#222222] mt-2">{user?.name || user?.email}</p>
+          {user?.name && user.email && <p className="text-[0.75rem] text-[#999999] mt-1">{user.email}</p>}
+          <div className="mt-8 space-y-3">
+            <Link to="/" className="block w-full bg-[#222222] text-white py-3 text-[0.75rem] uppercase tracking-[2px] hover:bg-[#333333]">
+              Retour a la boutique
+            </Link>
+            {isAdmin && (
+              <Link to="/admin" className="block w-full border border-[#222222] py-3 text-[0.75rem] uppercase tracking-[2px] hover:bg-[#f4f4f4]">
+                CRM
+              </Link>
+            )}
+            <button onClick={logout} className="text-[0.6875rem] uppercase tracking-[1.5px] text-[#666666] hover:text-[#222222] pt-2">
+              Se deconnecter
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="pt-[92px] min-h-[100dvh] flex items-center justify-center bg-[#f4f4f4]">
