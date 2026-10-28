@@ -68,8 +68,9 @@ export default function CollectionPage() {
     <div className="pt-[92px] min-h-[100dvh]">
       <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Sidebar */}
-          <aside className="lg:w-[220px] flex-shrink-0">
+          {/* Sidebar, sur grand ecran seulement : sur mobile et tablette elle
+              repoussait les articles sous l'ecran, et le menu liste deja les collections. */}
+          <aside className="hidden lg:block lg:w-[220px] flex-shrink-0">
             <h2 className="text-[0.6875rem] uppercase tracking-[2px] text-[#999999] mb-4">Collections</h2>
             <nav className="space-y-0">
               <Link
