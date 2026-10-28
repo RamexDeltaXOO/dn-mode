@@ -60,9 +60,13 @@
   }
 }
 
-/* Bandeau defilant : on respecte le reglage systeme "animations reduites"
-   en figeant le defilement et en recentrant le message. */
+/* Reglage systeme "animations reduites" : pas de defilement anime, et le
+   bandeau defilant est fige, message recentre. */
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   .marquee-track {
     animation: none !important;
     transform: none !important;
