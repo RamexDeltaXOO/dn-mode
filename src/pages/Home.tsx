@@ -116,10 +116,11 @@ export default function Home() {
             Remise automatique au panier**
           </p> */}
         </div>
-        {/* Scroll indicator */}
+        {/* Scroll indicator 
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2">
           <div className="w-[1px] h-10 bg-white/30 animate-bounce" />
         </div>
+        */}
       </section>
 
       {/* Brand Statement */}
