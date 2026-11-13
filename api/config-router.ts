@@ -6,6 +6,7 @@ import { siteConfig } from "@db/schema";
 import { ConfigKeys, HomeImageDefaults, HomeTextDefaults, type HomeTexts } from "@contracts/constants";
 import { SeoDefaults } from "@contracts/seo";
 import { getConfigValues } from "./lib/site-config";
+import { LEGAL_DOCUMENTS, LEGAL_DOCUMENT_TYPES } from "@contracts/legal";
 
 export const configRouter = createRouter({
   // Reserve a l'admin : la configuration contient les cles secretes
@@ -63,6 +64,18 @@ export const configRouter = createRouter({
       siteDescription: values[ConfigKeys.siteDescription]?.trim() || SeoDefaults.description,
     };
   }),
+
+  /** Uniquement le document demandé, jamais la configuration privée du CRM. */
+  legalDocument: publicQuery
+    .input(z.object({ type: z.enum(LEGAL_DOCUMENT_TYPES) }))
+    .query(async ({ input }) => {
+      const document = LEGAL_DOCUMENTS[input.type];
+      const values = await getConfigValues([document.configKey]);
+      return {
+        title: document.title,
+        content: values[document.configKey]?.trim() || document.defaultContent,
+      };
+    }),
 
   getByKey: adminQuery
     .input(z.object({ key: z.string() }))

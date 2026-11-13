@@ -96,6 +96,12 @@ export default function Footer() {
             </p>
           </div>
         </div>
+        <div className="border-t border-[#ececec] mt-10 pt-6 flex flex-wrap gap-x-6 gap-y-3 text-[0.75rem] text-[#666666]">
+          <Link to="/cgv" className="hover:text-[#222222] transition-colors">Conditions générales de vente</Link>
+          <Link to="/cgu" className="hover:text-[#222222] transition-colors">Conditions générales d'utilisation</Link>
+          <Link to="/mentions-legales" className="hover:text-[#222222] transition-colors">Mentions légales</Link>
+          <Link to="/retractation" className="hover:text-[#222222] transition-colors">Rétractation / Retour</Link>
+        </div>
       </div>
     </footer>
   );

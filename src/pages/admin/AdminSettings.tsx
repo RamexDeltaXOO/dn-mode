@@ -3,6 +3,8 @@ import { trpc } from "@/providers/trpc";
 import { Save, Check, CreditCard, Mail, Globe, Truck, Copy, Image, LayoutTemplate, Type } from "lucide-react";
 import { HomeImageDefaults, HomeTextDefaults, Paths, Shipping } from "@contracts/constants";
 import SingleImageUploader from "@/components/admin/SingleImageUploader";
+import LegalDocumentsEditor from "@/components/admin/LegalDocumentsEditor";
+import { LEGAL_DOCUMENTS } from "@contracts/legal";
 
 type FieldProps = {
   label: string;
@@ -118,6 +120,10 @@ const EMPTY_FORM = {
   home_look_collection: HomeTextDefaults.lookCollection as string,
   home_reviews_title: HomeTextDefaults.reviewsTitle as string,
   banner_messages: HomeTextDefaults.bannerMessages as string,
+  // Pages juridiques : valeurs de base, personnalisables sans redéploiement.
+  legal_cgv: LEGAL_DOCUMENTS.cgv.defaultContent,
+  legal_cgu: LEGAL_DOCUMENTS.cgu.defaultContent,
+  legal_mentions_legales: LEGAL_DOCUMENTS["mentions-legales"].defaultContent,
   // Stripe
   stripe_publishable_key: "",
   stripe_secret_key: "",
@@ -183,6 +189,7 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
       utils.config.list.invalidate();
       utils.config.homeImages.invalidate();
       utils.config.siteContent.invalidate();
+      utils.config.legalDocument.invalidate();
     },
   });
   const [saved, setSaved] = useState<string | null>(null);
@@ -210,6 +217,7 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
         setSaved(key);
         setTimeout(() => setSaved(null), 1500);
       },
+      onError: () => setSaved(`${key}-error`),
     });
   };
 
@@ -362,6 +370,25 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
               <p className="text-[0.625rem] text-[#999999]">Un champ vide remet le texte par defaut.</p>
             </div>
           </div>
+
+          {/* Pages juridiques : textes publies, modifiables dans le CRM */}
+          <LegalDocumentsEditor
+            values={{
+              cgv: form.legal_cgv,
+              cgu: form.legal_cgu,
+              "mentions-legales": form.legal_mentions_legales,
+            }}
+            onChange={(type, value) => setForm((previous) => ({
+              ...previous,
+              [LEGAL_DOCUMENTS[type].configKey]: value,
+            }))}
+            onSave={(type) => {
+              const key = LEGAL_DOCUMENTS[type].configKey;
+              handleSave(key, form[key as keyof typeof form]);
+            }}
+            isSaving={setConfig.isPending}
+            saved={saved}
+          />
 
           {/* Stripe Settings */}
           <div className="bg-white shadow-sm border border-[#e8e8e8] p-6">

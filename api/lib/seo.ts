@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import { and, asc, eq } from "drizzle-orm";
 import { ConfigKeys, HomeImageDefaults } from "@contracts/constants";
+import { LEGAL_DOCUMENTS, LEGAL_DOCUMENT_TYPES } from "@contracts/legal";
 import {
   SeoDefaults,
   collectionSeo,
@@ -354,6 +355,46 @@ export async function resolvePageMeta(pathname: string, settings: SeoSettings): 
       };
     }
 
+    // Documents juridiques : URLs publiques et SEO indexable, avec texte CRM.
+    const legalType = LEGAL_DOCUMENT_TYPES.find((type) => LEGAL_DOCUMENTS[type].path === path);
+    if (legalType) {
+      const document = LEGAL_DOCUMENTS[legalType];
+      const content = await getConfigValue(document.configKey, { fallback: document.defaultContent });
+      return {
+        status: 200,
+        title: pageTitle(document.title, settings.siteName),
+        description: document.description,
+        path,
+        noindex: false,
+        type: "website",
+        jsonLd: [breadcrumb(settings.baseUrl, [
+          { name: "Accueil", path: "/" },
+          { name: document.title, path },
+        ])],
+        fallback: fallbackHtml({
+          title: document.title,
+          extra: content.split(/\n{2,}/).map((section) => section.replace(/^##\s+/, "")).filter(Boolean),
+        }),
+      };
+    }
+    if (path === "/retractation") {
+      const title = "Exercer mon droit de rétractation";
+      return {
+        status: 200,
+        title: pageTitle(title, settings.siteName),
+        description: "Déclarez votre rétractation pour une commande DN MODE, sans compte client.",
+        path,
+        noindex: false,
+        type: "website",
+        jsonLd: [],
+        fallback: fallbackHtml({
+          title,
+          text: "Vous pouvez exercer votre droit de rétractation grâce au formulaire en ligne ou écrire à sav.dnmode@gmail.com.",
+          links: [{ href: "/cgv", label: "Consulter les CGV" }],
+        }),
+      };
+    }
+
     const match = /^\/(collections|products)\/([^/]+)$/.exec(path);
     if (match) {
       let slug: string;
@@ -527,6 +568,8 @@ export function createSitemapHandler() {
           images: (p.images ?? []).filter(Boolean),
         })),
         { path: "/contact" },
+        ...LEGAL_DOCUMENT_TYPES.map((type) => ({ path: LEGAL_DOCUMENTS[type].path })),
+        { path: "/retractation" },
       ];
       return c.body(buildSitemap(baseUrl, entries), 200, {
         "Content-Type": "application/xml; charset=utf-8",

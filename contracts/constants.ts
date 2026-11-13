@@ -104,7 +104,7 @@ export const HomeTextDefaults = {
   lookCollection: "look-du-moment",
   reviewsTitle: "Avis clients",
   // Un message par ligne, apres celui de la livraison offerte.
-  bannerMessages: "Paiement securise\nNi echange ni remboursement",
+  bannerMessages: "Paiement sécurisé\nRétractation sous 14 jours selon les CGV",
 } as const;
 
 export type HomeTexts = { [K in keyof typeof HomeTextDefaults]: string };

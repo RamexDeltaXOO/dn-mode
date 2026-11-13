@@ -135,10 +135,11 @@ function CheckoutForm({ clientSecret, orderId, confirmToken, orderNumber, total,
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [message, setMessage] = useState("");
+  const [acceptedCgv, setAcceptedCgv] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!stripe || !elements) return;
+    if (!stripe || !elements || !acceptedCgv) return;
 
     setIsProcessing(true);
     setMessage("");
@@ -185,13 +186,30 @@ function CheckoutForm({ clientSecret, orderId, confirmToken, orderNumber, total,
         <PaymentElement />
       </div>
 
+      <label className="flex items-start gap-3 text-[0.8125rem] leading-relaxed text-[#555555] cursor-pointer">
+        <input
+          type="checkbox"
+          required
+          checked={acceptedCgv}
+          onChange={(event) => setAcceptedCgv(event.target.checked)}
+          className="mt-1 shrink-0 accent-[#222222]"
+        />
+        <span>
+          J'ai lu et j'accepte les{" "}
+          <Link to="/cgv" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 text-[#222222]">
+            conditions générales de vente
+          </Link>
+          , notamment les informations sur le droit de rétractation.
+        </span>
+      </label>
+
       {message && message !== "success" && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-[0.8125rem]">{message}</div>
       )}
 
       <button
         type="submit"
-        disabled={isProcessing || !stripe}
+        disabled={isProcessing || !stripe || !acceptedCgv}
         className="w-full bg-[#222222] text-white py-3.5 text-[0.75rem] uppercase tracking-[2px] hover:bg-[#333333] disabled:opacity-50 flex items-center justify-center gap-2"
       >
         {isProcessing ? (

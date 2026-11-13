@@ -26,6 +26,8 @@ const AdminMessages = lazy(() => import("./pages/admin/AdminMessages"));
 const AdminEmails = lazy(() => import("./pages/admin/AdminEmails"));
 const AdminCampaigns = lazy(() => import("./pages/admin/AdminCampaigns"));
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
+const LegalPage = lazy(() => import("./pages/LegalPage"));
+const RetractionPage = lazy(() => import("./pages/RetractionPage"));
 
 function App() {
   useEffect(() => {
@@ -44,6 +46,10 @@ function App() {
             <Route path="/collections/:slug" element={<CollectionPage />} />
             <Route path="/products/:slug" element={<ProductPage />} />
             <Route path="/contact" element={<ContactPage />} />
+            <Route path="/cgv" element={<LegalPage type="cgv" />} />
+            <Route path="/cgu" element={<LegalPage type="cgu" />} />
+            <Route path="/mentions-legales" element={<LegalPage type="mentions-legales" />} />
+            <Route path="/retractation" element={<RetractionPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/login" element={<Login />} />
           </Route>
