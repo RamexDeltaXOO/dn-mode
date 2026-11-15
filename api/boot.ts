@@ -10,6 +10,7 @@ import { env } from "./lib/env";
 import { createGoogleCallbackHandler } from "./lib/google-oauth";
 import { createImageHandler, createUploadHandler } from "./lib/storage";
 import { ensureSchema } from "./lib/ensure-schema";
+import { migrateAdminAccountEmail } from "./lib/admin-account-migration";
 import { normalizeCollectionSlugs, normalizeProductSlugs } from "./lib/slugs";
 import { createStripeWebhookHandler } from "./lib/stripe-webhook";
 import { createRobotsHandler, createSitemapHandler } from "./lib/seo";
@@ -58,9 +59,11 @@ if (env.isProduction) {
   const { serveStaticFiles } = await import("./lib/vite");
   serveStaticFiles(app);
 
-  // Sans attendre : une base lente ne doit pas retarder le demarrage.
-  // A chaque demarrage (donc a chaque deploiement), les slugs produits et
-  // collections invalides (majuscules, accents...) sont corriges en base.
+  // Le transfert administrateur doit etre termine avant toute connexion.
+  // En cas d'erreur SQL, le serveur ne demarre pas avec les anciens droits.
+  await migrateAdminAccountEmail();
+
+  // La normalisation des slugs reste non bloquante.
   ensureSchema()
     .catch((err) => console.error("[schema]", err))
     .then(async () => {

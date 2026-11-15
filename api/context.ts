@@ -1,6 +1,6 @@
 import type { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
 import type { User } from "@db/schema";
-import { verifyLocalToken } from "./local-auth-router";
+import { tokenMatchesCurrentUser, verifyLocalToken } from "./local-auth-router";
 import { getDb } from "./queries/connection";
 import { users } from "@db/schema";
 import { eq } from "drizzle-orm";
@@ -24,7 +24,7 @@ export async function createContext(
       if (payload) {
         const db = getDb();
         const [user] = await db.select().from(users).where(eq(users.id, payload.sub));
-        if (user) {
+        if (user && tokenMatchesCurrentUser(payload, user)) {
           ctx.user = user;
         }
       }

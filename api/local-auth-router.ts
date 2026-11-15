@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { User } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { createRouter, publicQuery } from "./middleware";
 import { getDb } from "./queries/connection";
@@ -23,6 +24,17 @@ const publicUserFields = {
 
 // ── Jetons de session (JWT HS256 signes avec APP_SECRET) ────
 export type TokenPayload = { sub: number; email: string; role: string; iat: number; exp: number };
+
+/**
+ * Un jeton cree avant un changement d'email ou de role ne donne plus acces au
+ * compte, meme si son identifiant numerique est toujours valide.
+ */
+export function tokenMatchesCurrentUser(
+  payload: TokenPayload,
+  user: Pick<User, "email" | "role">,
+): boolean {
+  return payload.email === (user.email ?? "") && payload.role === user.role;
+}
 
 const encoder = new TextEncoder();
 
@@ -186,6 +198,6 @@ export const localAuthRouter = createRouter({
 
     const db = getDb();
     const [user] = await db.select(publicUserFields).from(users).where(eq(users.id, payload.sub));
-    return user ?? null;
+    return user && tokenMatchesCurrentUser(payload, user) ? user : null;
   }),
 });

@@ -10,7 +10,7 @@ import {
 import { images, users } from "@db/schema";
 import { getConfigValue } from "./site-config";
 import { getDb } from "../queries/connection";
-import { verifyLocalToken } from "../local-auth-router";
+import { tokenMatchesCurrentUser, verifyLocalToken } from "../local-auth-router";
 
 /**
  * Stockage des images produits.
@@ -232,8 +232,8 @@ async function requireAdmin(headers: Headers): Promise<boolean> {
   try {
     const db = getDb();
     const [user] = await db.select().from(users).where(eq(users.id, payload.sub));
-    // Le role est relu en base : jamais celui porte par le jeton.
-    return user?.role === "admin";
+    // Un ancien jeton ne doit pas rester valide apres un transfert admin.
+    return Boolean(user && tokenMatchesCurrentUser(payload, user) && user.role === "admin");
   } catch {
     return false;
   }
