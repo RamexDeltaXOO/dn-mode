@@ -11,6 +11,7 @@ import ShippingMethodSelector from "@/components/ShippingMethodSelector";
 import type { ShippingMethodOption } from "@/components/ShippingMethodSelector";
 import ServicePointPicker from "@/components/ServicePointPicker";
 import type { SelectedServicePoint } from "@/components/ServicePointPicker";
+import { canSubmitStripePayment, isStripePaymentElementNotReady, paymentErrorMessage } from "@/lib/stripe-payment";
 
 function PaymentSuccess({ orderNumber, carrierName, servicePoint }: {
   orderNumber: string;
@@ -116,7 +117,7 @@ function PaymentReturn({ paymentIntentId, redirectStatus }: { paymentIntentId: s
   );
 }
 
-function CheckoutForm({ clientSecret, orderId, confirmToken, orderNumber, total, carrierName, servicePoint }: {
+function CheckoutForm({ clientSecret, orderId, confirmToken, orderNumber, total, carrierName, servicePoint, onProcessingChange }: {
   clientSecret: string;
   orderId: number;
   confirmToken: string;
@@ -124,6 +125,7 @@ function CheckoutForm({ clientSecret, orderId, confirmToken, orderNumber, total,
   total: number;
   carrierName: string | null;
   servicePoint: SelectedServicePoint | null;
+  onProcessingChange: (processing: boolean) => void;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -133,23 +135,83 @@ function CheckoutForm({ clientSecret, orderId, confirmToken, orderNumber, total,
     onSuccess: () => clearCart.mutate(),
   });
 
+  // stripe et elements existent avant que l'iframe de paiement ne soit prete.
+  // Seul onReady du PaymentElement autorise l'envoi.
+  const [paymentElementReady, setPaymentElementReady] = useState(false);
+  const elementReadyRef = useRef(false);
+  const submittingRef = useRef(false);
+  const [elementAttempt, setElementAttempt] = useState(0);
+  const [loadError, setLoadError] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [message, setMessage] = useState("");
   const [acceptedCgv, setAcceptedCgv] = useState(false);
 
+  const canPay = canSubmitStripePayment({
+    stripeLoaded: Boolean(stripe),
+    elementsLoaded: Boolean(elements),
+    paymentElementReady,
+    acceptedCgv,
+    processing: isProcessing || confirmPayment.isPending,
+    loadingError: Boolean(loadError),
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!stripe || !elements || !acceptedCgv || isProcessing) return;
+  const reloadPaymentElement = () => {
+    if (submittingRef.current) return;
+    elementReadyRef.current = false;
+    setPaymentElementReady(false);
+    setLoadError("");
+    setMessage("");
+    // Un nouveau key remonte uniquement le PaymentElement du meme PaymentIntent.
+    setElementAttempt((attempt) => attempt + 1);
+  };
 
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (submittingRef.current) return;
+    if (!stripe || !elements || !canPay || !elementReadyRef.current) {
+      setMessage("Patientez jusqu'au chargement complet du formulaire de paiement, ou cliquez sur Recharger.");
+      return;
+    }
+
+    // Verifie que l'Element est encore monte au moment du clic.
+    if (!elements.getElement(PaymentElement)) {
+      elementReadyRef.current = false;
+      setPaymentElementReady(false);
+      setLoadError("Le formulaire de paiement s'est deconnecte. Rechargez-le avant de payer.");
+      return;
+    }
+
+    submittingRef.current = true;
     setIsProcessing(true);
+    onProcessingChange(true);
     setMessage("");
 
     try {
       if (clientSecret === "pi_demo_secret") {
-        // Ne jamais afficher une confirmation avant la validation serveur.
+        // Cette branche ne s'affiche pas en production si Stripe est indisponible.
         const result = await confirmPayment.mutateAsync({ orderId, confirmToken });
         if (!result.order) throw new Error("La commande n'a pas pu etre confirmee.");
+        return;
+      }
+
+      // Valide les champs Stripe (wallets inclus) avant de confirmer le paiement.
+      const { error: submitError } = await elements.submit();
+      if (submitError) {
+        const readable = paymentErrorMessage(submitError.message);
+        if (isStripePaymentElementNotReady(submitError.message)) {
+          elementReadyRef.current = false;
+          setPaymentElementReady(false);
+          setLoadError(readable);
+        } else {
+          setMessage(readable);
+        }
+        return;
+      }
+
+      if (!elementReadyRef.current || !elements.getElement(PaymentElement)) {
+        elementReadyRef.current = false;
+        setPaymentElementReady(false);
+        setLoadError("Le formulaire de paiement a ete interrompu. Rechargez-le avant de payer.");
         return;
       }
 
@@ -158,27 +220,46 @@ function CheckoutForm({ clientSecret, orderId, confirmToken, orderNumber, total,
         confirmParams: { return_url: window.location.origin + "/checkout" },
         redirect: "if_required",
       });
-      if (error) throw new Error(error.message || "Le paiement a echoue.");
+      if (error) {
+        const readable = paymentErrorMessage(error.message);
+        if (isStripePaymentElementNotReady(error.message)) {
+          elementReadyRef.current = false;
+          setPaymentElementReady(false);
+          setLoadError(readable);
+        } else {
+          setMessage(readable);
+        }
+        return;
+      }
 
       if (paymentIntent?.status === "succeeded") {
         const result = await confirmPayment.mutateAsync({ orderId, paymentIntentId: paymentIntent.id });
         if (!result.order) throw new Error("Impossible de confirmer la commande apres le paiement.");
       } else if (paymentIntent?.status === "processing") {
-        setMessage("Votre paiement est en cours de verification. Ne recommencez pas tout de suite.");
+        setMessage("Paiement en cours de verification. Ne lancez pas de second paiement.");
       } else {
-        setMessage("Le paiement n'est pas confirme. Veuillez verifier votre moyen de paiement.");
+        setMessage("Le paiement n'est pas confirme. Verifiez votre moyen de paiement.");
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Une erreur est survenue.");
+      const raw = error instanceof Error ? error.message : null;
+      if (isStripePaymentElementNotReady(raw)) {
+        elementReadyRef.current = false;
+        setPaymentElementReady(false);
+        setLoadError(paymentErrorMessage(raw));
+      } else {
+        setMessage(paymentErrorMessage(raw));
+      }
     } finally {
+      submittingRef.current = false;
       setIsProcessing(false);
+      onProcessingChange(false);
     }
   };
 
   if (confirmPayment.data?.order) {
     return (
       <PaymentSuccess
-        orderNumber={confirmPayment.data.order.orderNumber}
+        orderNumber={confirmPayment.data.order.orderNumber || orderNumber}
         carrierName={carrierName}
         servicePoint={servicePoint ? servicePoint.name + ", " + servicePoint.address : null}
       />
@@ -187,40 +268,67 @@ function CheckoutForm({ clientSecret, orderId, confirmToken, orderNumber, total,
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="border border-[#e0e0e0] p-4 bg-white">
-        <PaymentElement />
+      <div className="border border-[#e0e0e0] bg-white p-4">
+        <PaymentElement
+          key={elementAttempt}
+          onReady={() => {
+            elementReadyRef.current = true;
+            setPaymentElementReady(true);
+            setLoadError("");
+          }}
+          onLoadError={(event) => {
+            elementReadyRef.current = false;
+            setPaymentElementReady(false);
+            setLoadError(paymentErrorMessage(event.error.message));
+          }}
+        />
+
+        {!paymentElementReady && !loadError && (
+          <p role="status" className="mt-3 text-[0.75rem] text-[#666666]">
+            Initialisation du formulaire de paiement securise...
+          </p>
+        )}
+        {!paymentElementReady && !isProcessing && (
+          <button type="button" onClick={reloadPaymentElement}
+            className="mt-3 text-[0.75rem] text-[#222222] underline underline-offset-4">
+            Recharger les moyens de paiement
+          </button>
+        )}
+        {loadError && (
+          <p role="alert" className="mt-3 border border-red-200 bg-red-50 p-3 text-[0.8125rem] text-red-700">
+            {loadError}
+          </p>
+        )}
       </div>
 
-      <label className="flex items-start gap-3 text-[0.8125rem] leading-relaxed text-[#555555] cursor-pointer">
-        <input
-          type="checkbox"
-          required
-          checked={acceptedCgv}
+      <label className="flex cursor-pointer items-start gap-3 text-[0.8125rem] leading-relaxed text-[#555555]">
+        <input type="checkbox" required checked={acceptedCgv}
           onChange={(event) => setAcceptedCgv(event.target.checked)}
-          className="mt-1 shrink-0 accent-[#222222]"
-        />
+          className="mt-1 shrink-0 accent-[#222222]" />
         <span>
           J'ai lu et j'accepte les{" "}
-          <Link to="/cgv" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 text-[#222222]">
-            conditions générales de vente
+          <Link to="/cgv" target="_blank" rel="noopener noreferrer"
+            className="text-[#222222] underline underline-offset-4">
+            conditions generales de vente
           </Link>
-          , notamment les informations sur le droit de rétractation.
+          , notamment les informations sur le droit de retractation.
         </span>
       </label>
 
-      {message && message !== "success" && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-[0.8125rem]">{message}</div>
+      {message && (
+        <p role="alert" className="border border-red-200 bg-red-50 px-4 py-3 text-[0.8125rem] text-red-700">
+          {message}
+        </p>
       )}
 
-      <button
-        type="submit"
-        disabled={isProcessing || confirmPayment.isPending || !stripe || !acceptedCgv}
-        className="w-full bg-[#222222] text-white py-3.5 text-[0.75rem] uppercase tracking-[2px] hover:bg-[#333333] disabled:opacity-50 flex items-center justify-center gap-2"
-      >
-        {isProcessing ? (
-          <><div className="w-4 h-4 border border-white border-t-transparent animate-spin" />Traitement...</>
+      <button type="submit" disabled={!canPay}
+        className="flex w-full items-center justify-center gap-2 bg-[#222222] py-3.5 text-[0.75rem] uppercase tracking-[2px] text-white hover:bg-[#333333] disabled:cursor-not-allowed disabled:opacity-50">
+        {isProcessing || confirmPayment.isPending ? (
+          <><span className="h-4 w-4 animate-spin rounded-full border border-white border-t-transparent" /> Paiement en cours...</>
+        ) : !paymentElementReady ? (
+          "Chargement du paiement..."
         ) : (
-          <><ShoppingBag size={16} />Payer €{total.toFixed(2)}</>
+          <><ShoppingBag size={16} /> Payer {total.toFixed(2)} €</>
         )}
       </button>
     </form>
@@ -271,6 +379,7 @@ function CheckoutFlow() {
   const [postalCode, setPostalCode] = useState("");
   const [phone, setPhone] = useState("");
   const [step, setStep] = useState<CheckoutStep>("contact");
+  const [confirmingPayment, setConfirmingPayment] = useState(false);
   const [shippingMethod, setShippingMethod] = useState<ShippingMethodOption | null>(null);
   const [servicePoint, setServicePoint] = useState<SelectedServicePoint | null>(null);
   const [formError, setFormError] = useState("");
@@ -319,6 +428,18 @@ function CheckoutFlow() {
     return key && key !== "pk_test_dummy" ? loadStripe(key) : null;
   }, [stripeConfig?.publishableKey]);
 
+  // Les options du provider doivent rester identiques entre les re-renders.
+  // Un nouveau PaymentIntent donne une nouvelle cle afin de remonter Elements.
+  const paymentClientSecret = paymentData?.clientSecret;
+  const stripeElementsOptions = useMemo(() => {
+    if (!paymentClientSecret || paymentClientSecret === "pi_demo_secret") return null;
+    return {
+      clientSecret: paymentClientSecret,
+      appearance: { theme: "stripe" as const },
+      loader: "auto" as const,
+    };
+  }, [paymentClientSecret]);
+
   const activeIndex = checkoutSteps.findIndex((item) => item.key === step);
   const needsServicePoint = Boolean(shippingMethod?.requiresServicePoint);
 
@@ -330,7 +451,7 @@ function CheckoutFlow() {
   };
 
   const goBack = (target: CheckoutStep) => {
-    if (checkoutSteps.findIndex((item) => item.key === target) >= activeIndex) return;
+    if (confirmingPayment || checkoutSteps.findIndex((item) => item.key === target) >= activeIndex) return;
     setPaymentData(null);
     setPaymentSnapshot(null);
     setFormError("");
@@ -422,7 +543,7 @@ function CheckoutFlow() {
               <div key={item.key} className="contents">
                 {index > 0 && <span aria-hidden="true" className={"mx-2 sm:mx-4 h-px flex-1 " + (completed ? "bg-[#222222]" : "bg-[#dddddd]")} />}
                 <button type="button" onClick={() => goBack(item.key)}
-                  disabled={!completed} aria-current={current ? "step" : undefined}
+                  disabled={!completed || confirmingPayment} aria-current={current ? "step" : undefined}
                   className={"flex min-w-0 items-center gap-1.5 sm:gap-2 text-left " +
                     (current || completed ? "text-[#222222]" : "text-[#a3a3a3]") +
                     (completed ? " cursor-pointer" : " cursor-default")}>
@@ -582,8 +703,8 @@ function CheckoutFlow() {
                       {servicePoint && <p className="text-[0.75rem] text-[#666666] mt-1">{servicePoint.name} · {servicePoint.address}</p>}
                       {!servicePoint && <p className="text-[0.75rem] text-[#666666] mt-1">{address}, {postalCode} {city}</p>}
                     </div>
-                    <button type="button" onClick={() => goBack("delivery")}
-                      className="text-[0.75rem] underline underline-offset-4 shrink-0">Modifier</button>
+                    <button type="button" onClick={() => goBack("delivery")} disabled={confirmingPayment}
+                      className="text-[0.75rem] underline underline-offset-4 shrink-0 disabled:opacity-40">Modifier</button>
                   </div>
                 </div>
                 <div className="bg-white border border-[#e4e4e4] p-5 sm:p-7">
@@ -596,22 +717,20 @@ function CheckoutFlow() {
                       Le paiement en ligne est temporairement indisponible. Votre commande n'est pas confirmee,
                       aucun paiement n'a ete effectue. Veuillez reessayer plus tard.
                     </p>
-                  ) : (
-                    <Elements stripe={stripePromise} options={{
-                      clientSecret: paymentData.clientSecret,
-                      appearance: { theme: "stripe" },
-                    }}>
+                  ) : stripeElementsOptions ? (
+                    <Elements key={paymentData.clientSecret} stripe={stripePromise} options={stripeElementsOptions}>
                       <CheckoutForm
                         clientSecret={paymentData.clientSecret}
                         orderId={paymentData.orderId}
                         confirmToken={paymentData.confirmToken}
+                        onProcessingChange={setConfirmingPayment}
                         orderNumber={paymentData.orderNumber}
                         total={paymentData.total}
                         carrierName={shippingMethod ? carrierLabel(shippingMethod.carrier) + " · " + shippingMethod.name : null}
                         servicePoint={servicePoint}
                       />
                     </Elements>
-                  )}
+                  ) : null}
                 </div>
               </div>
             )}
