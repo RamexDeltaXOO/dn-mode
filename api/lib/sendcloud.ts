@@ -32,6 +32,8 @@ export type ServicePoint = {
   city: string;
   country: string;
   distance: number | null;
+  latitude: number | null;
+  longitude: number | null;
   carrier: string;
   openingHours: string[];
 };
@@ -263,42 +265,6 @@ const DEMO_PRICES: Record<string, number> = { colissimo: 5.9, chronopost: 9.9, m
 /** Tarif de repli par transporteur, pour une offre creee sans prix. */
 export function demoPriceFor(carrier: string): number {
   return DEMO_PRICES[normalizeCarrier(carrier)] ?? 5.9;
-}
-
-const DEMO_POINT_NAMES = [
-  "Tabac Le Central",
-  "Presse du Marche",
-  "Superette Bio",
-  "Librairie Papeterie",
-];
-
-const DEMO_POINT_STREETS = [
-  { street: "Rue de la Republique", houseNumber: "12" },
-  { street: "Avenue des Tilleuls", houseNumber: "4" },
-  { street: "Place du Marche", houseNumber: "8" },
-  { street: "Boulevard Voltaire", houseNumber: "27" },
-];
-
-function demoServicePoints(carrier: string, postalCode: string, city: string): ServicePoint[] {
-  return DEMO_POINT_NAMES.map((name, index) => ({
-    id: `demo-${postalCode || "00000"}-${index + 1}`,
-    name,
-    street: DEMO_POINT_STREETS[index].street,
-    houseNumber: DEMO_POINT_STREETS[index].houseNumber,
-    postalCode: postalCode || "75001",
-    city: city || "Paris",
-    country: "FR",
-    distance: (index + 1) * 320,
-    carrier: normalizeCarrier(carrier) || "mondial_relay",
-    openingHours: [
-      "Lundi: 09:00 - 19:00",
-      "Mardi: 09:00 - 19:00",
-      "Mercredi: 09:00 - 19:00",
-      "Jeudi: 09:00 - 19:00",
-      "Vendredi: 09:00 - 19:00",
-      "Samedi: 09:00 - 13:00",
-    ],
-  }));
 }
 
 // ── Compte ──────────────────────────────────────────────────
@@ -541,6 +507,7 @@ export async function resolveSender(): Promise<{ sender: Sender | null; error?: 
 
 // ── Points relais ───────────────────────────────────────────
 type RawServicePoint = {
+  is_active?: unknown;
   id?: unknown;
   code?: unknown;
   name?: unknown;
@@ -550,59 +517,114 @@ type RawServicePoint = {
   city?: unknown;
   country?: unknown;
   distance?: unknown;
+  latitude?: unknown;
+  longitude?: unknown;
   carrier?: unknown;
   formatted_opening_times?: unknown;
 };
 
-export async function searchServicePoints(input: {
+export type ServicePointSearch = {
   carrier: string;
-  postalCode: string;
+  address?: string;
+  postalCode?: string;
   city?: string;
   country?: string;
+  latitude?: number;
+  longitude?: number;
   radius?: number;
-}): Promise<{ source: "sendcloud" | "demo"; points: ServicePoint[]; error?: string }> {
-  const country = (input.country || "FR").toUpperCase();
-  const creds = await getSendcloudCredentials();
-  if (!creds.configured) {
-    return { source: "demo", points: demoServicePoints(input.carrier, input.postalCode, input.city ?? "") };
+};
+
+/**
+ * L'API Sendcloud interprete postal_code/city comme des filtres exacts :
+ * ils excluent les relais situes juste de l'autre cote d'un code postal.
+ * Une adresse libre est geocodee pour chercher AUTOUR du lieu, sans filtre
+ * de zone. Les coordonnees GPS sont encore plus precises.
+ */
+export function buildServicePointSearchParams(input: ServicePointSearch): URLSearchParams {
+  const params = new URLSearchParams({
+    country: (input.country || "FR").toUpperCase(),
+    carrier: normalizeCarrier(input.carrier),
+    radius: String(input.radius ?? 10000),
+  });
+
+  if (input.latitude !== undefined && input.longitude !== undefined) {
+    params.set("latitude", String(input.latitude));
+    params.set("longitude", String(input.longitude));
+  } else if (input.address?.trim()) {
+    params.set("address", input.address.trim());
+  } else {
+    // Ancien consommateur eventuel : conserver la recherche par zone.
+    if (input.postalCode?.trim()) params.set("postal_code", input.postalCode.trim());
+    if (input.city?.trim()) params.set("city", input.city.trim());
   }
 
-  const params = new URLSearchParams({
-    country,
-    postal_code: input.postalCode,
-    carrier: normalizeCarrier(input.carrier),
-    radius: String(input.radius ?? 5000),
-  });
-  if (input.city) params.set("city", input.city);
+  return params;
+}
 
+/** Distance a vol d'oiseau, utilisee si Sendcloud omet la distance. */
+function distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const rad = Math.PI / 180;
+  const a =
+    Math.sin(((lat2 - lat1) * rad) / 2) ** 2 +
+    Math.cos(lat1 * rad) * Math.cos(lat2 * rad) *
+    Math.sin(((lon2 - lon1) * rad) / 2) ** 2;
+  return Math.round(2 * 6371000 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+export async function searchServicePoints(input: ServicePointSearch): Promise<{
+  source: "sendcloud" | "demo";
+  points: ServicePoint[];
+  error?: string;
+}> {
+  const creds = await getSendcloudCredentials();
+  if (!creds.configured) {
+    // Jamais de points relais inventes sur un checkout utilisable.
+    return { source: "demo", points: [], error: "La recherche de points relais n'est pas encore configuree." };
+  }
+
+  const params = buildServicePointSearchParams(input);
   const result = await sendcloudRequest<RawServicePoint[]>(
     `/service-points?${params.toString()}`,
     { base: SERVICE_POINTS_API, creds },
   );
 
   if (!result.ok) {
-    return {
-      source: "demo",
-      points: demoServicePoints(input.carrier, input.postalCode, input.city ?? ""),
-      error: result.error,
-    };
+    // Une erreur live ne doit jamais retomber sur des relais fictifs.
+    return { source: "sendcloud", points: [], error: "Recherche indisponible : " + result.error };
   }
 
+  const country = (input.country || "FR").toUpperCase();
   const raw = Array.isArray(result.data) ? result.data : [];
-  const points: ServicePoint[] = raw.map((p) => ({
-    id: String(p?.id ?? p?.code ?? ""),
-    name: String(p?.name ?? "Point relais"),
-    street: String(p?.street ?? ""),
-    houseNumber: String(p?.house_number ?? ""),
-    postalCode: String(p?.postal_code ?? input.postalCode),
-    city: String(p?.city ?? input.city ?? ""),
-    country: String(p?.country ?? country),
-    distance: toNumber(p?.distance),
-    carrier: normalizeCarrier(p?.carrier ?? input.carrier),
-    openingHours: parseOpeningHours(p?.formatted_opening_times),
-  }));
+  const points: ServicePoint[] = raw.filter((p) => p?.is_active !== false).map((p) => {
+    const latitude = toNumber(p?.latitude);
+    const longitude = toNumber(p?.longitude);
+    const providerDistance = toNumber(p?.distance);
+    const distance = providerDistance !== null
+      ? providerDistance
+      : latitude !== null && longitude !== null &&
+        input.latitude !== undefined && input.longitude !== undefined
+        ? distanceMeters(input.latitude, input.longitude, latitude, longitude)
+        : null;
+    return {
+      id: String(p?.id ?? p?.code ?? ""),
+      name: String(p?.name ?? "Point relais"),
+      street: String(p?.street ?? ""),
+      houseNumber: String(p?.house_number ?? ""),
+      postalCode: String(p?.postal_code ?? input.postalCode ?? ""),
+      city: String(p?.city ?? input.city ?? ""),
+      country: String(p?.country ?? country),
+      distance,
+      latitude,
+      longitude,
+      carrier: normalizeCarrier(p?.carrier ?? input.carrier),
+      openingHours: parseOpeningHours(p?.formatted_opening_times),
+    };
+  });
 
-  return { source: "sendcloud", points: points.filter((p) => p.id !== "") };
+  return {
+    source: "sendcloud",
+    points: points.filter((p) => p.id !== "").sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity)),
+  };
 }
 
 // ── Colis / etiquettes ──────────────────────────────────────

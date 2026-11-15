@@ -111,15 +111,15 @@ export const stripeRouter = createRouter({
         email: z.string().email().max(320),
         items: orderItemsInput,
         shipping: z.object({
-          firstName: shortText(100).optional(),
-          lastName: shortText(100).optional(),
-          address: shortText(500).optional(),
-          city: shortText(100).optional(),
-          postalCode: shortText(20).optional(),
-          country: shortText(100).optional(),
-          phone: shortText(30).optional(),
-        }).optional(),
-        shippingMethodId: z.number().int().optional(),
+          firstName: z.string().trim().min(1).max(100),
+          lastName: z.string().trim().min(1).max(100),
+          address: z.string().trim().min(5).max(500),
+          city: z.string().trim().min(2).max(100),
+          postalCode: z.string().trim().regex(/^[0-9]{5}$/, "Code postal francais invalide"),
+          country: z.literal("France"),
+          phone: z.string().trim().min(10).max(30),
+        }),
+        shippingMethodId: z.number().int().positive(),
         servicePoint: z.object({
           id: shortText(100),
           name: shortText(255),
@@ -183,6 +183,26 @@ export const stripeRouter = createRouter({
         methodId: input.shippingMethodId ?? null,
         weightGrams,
       });
+      // Revalidation serveur : ni adresse ni relais ni methode manquants,
+      // meme si un client contourne les validations du navigateur.
+      if (quote.methodId !== input.shippingMethodId || quote.weightOutOfRange) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Ce mode de livraison n'est plus disponible pour ce panier.",
+        });
+      }
+      if (quote.requiresServicePoint && !input.servicePoint) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Choisissez un point relais avant de passer au paiement.",
+        });
+      }
+      if (!quote.requiresServicePoint && input.servicePoint) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cette livraison a domicile n'utilise pas de point relais.",
+        });
+      }
       const shippingCost = quote.cost;
       const total = subtotal + shippingCost;
       const totalCents = Math.round(total * 100);

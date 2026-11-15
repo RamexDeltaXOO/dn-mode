@@ -211,16 +211,24 @@ export const sendcloudRouter = createRouter({
   servicePoints: publicQuery
     .input(
       z.object({
-        postalCode: z.string().min(1),
-        city: z.string().optional(),
-        country: z.string().optional(),
-        carrier: z.string().min(1),
-        radius: z.number().optional(),
-      }),
+        address: z.string().trim().min(5).max(300).optional(),
+        postalCode: z.string().trim().max(20).optional(),
+        city: z.string().trim().max(100).optional(),
+        country: z.literal("FR").default("FR"),
+        carrier: z.string().trim().min(1).max(80),
+        radius: z.number().int().min(500).max(30000).default(10000),
+        latitude: z.number().min(-90).max(90).optional(),
+        longitude: z.number().min(-180).max(180).optional(),
+      }).refine(
+        (input) =>
+          (input.latitude !== undefined && input.longitude !== undefined) ||
+          Boolean(input.address || input.postalCode),
+        { message: "Indiquez une adresse ou autorisez la localisation." },
+      ),
     )
     .query(async ({ input }) => {
-      const { source, points } = await searchServicePoints(input);
-      return { source, points };
+      const { source, points, error } = await searchServicePoints(input);
+      return { source, points, error: error ?? null };
     }),
 
   createLabel: adminQuery

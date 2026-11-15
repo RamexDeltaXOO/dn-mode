@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-import { Truck } from "lucide-react";
+import { Check, Home, MapPin, Truck } from "lucide-react";
 import { carrierLabel } from "@contracts/constants";
 import { trpc } from "@/providers/trpc";
 
@@ -16,92 +15,87 @@ interface ShippingMethodSelectorProps {
   value: number | null;
   onChange: (method: ShippingMethodOption | null) => void;
   subtotal: number;
-  /** Poids du colis en grammes, emballage compris. */
   weightGrams: number;
 }
 
-/** Liste des modes de livraison (Colissimo / Chronopost / Mondial Relay). */
+const euro = (amount: number) => amount.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+
+/** Options de livraison sous forme de choix explicite, jamais preselectionne. */
 export default function ShippingMethodSelector({
   value,
   onChange,
   subtotal,
   weightGrams,
 }: ShippingMethodSelectorProps) {
-  // Le serveur ne renvoie que les methodes dont la tranche couvre ce poids.
-  const { data: methods, isLoading } = trpc.shipping.list.useQuery({ weightGrams });
+  const { data: methods, isLoading, isError } = trpc.shipping.list.useQuery({ weightGrams });
   const { data: settings } = trpc.shipping.settings.useQuery();
-
   const isFree = settings ? subtotal >= settings.threshold : false;
-
-  const options: ShippingMethodOption[] = (methods ?? []).map((m) => ({
-    id: m.id,
-    name: m.name,
-    carrier: m.carrier,
-    price: Number.parseFloat(String(m.price)) || 0,
-    estimatedDays: m.estimatedDays,
-    requiresServicePoint: Boolean(m.requiresServicePoint),
-  }));
-
-  // Preselection du premier mode disponible.
-  useEffect(() => {
-    if (value === null && options.length > 0) {
-      onChange(options[0]);
-    }
-  }, [value, options, onChange]);
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <div className="w-6 h-6 border-2 border-[#222222] border-t-transparent animate-spin" />
+      <div role="status" className="flex items-center gap-3 py-6 text-[0.8125rem] text-[#666666]">
+        <div className="w-5 h-5 border-2 border-[#222222] border-t-transparent rounded-full animate-spin" />
+        Chargement des modes de livraison...
       </div>
     );
   }
 
-  if (options.length === 0) {
-    return (
-      <p className="text-[0.8125rem] text-[#999999] py-4">
-        Aucune methode de livraison disponible pour le moment.
-      </p>
-    );
+  if (isError) {
+    return <p role="alert" className="text-[0.8125rem] text-red-700">Impossible de charger les offres de livraison.</p>;
+  }
+
+  const options: ShippingMethodOption[] = (methods ?? []).map((method) => ({
+    id: method.id,
+    name: method.name,
+    carrier: method.carrier,
+    price: Number.parseFloat(String(method.price)) || 0,
+    estimatedDays: method.estimatedDays,
+    requiresServicePoint: Boolean(method.requiresServicePoint),
+  }));
+
+  if (!options.length) {
+    return <p className="text-[0.8125rem] text-[#777777] py-4">Aucun mode de livraison disponible actuellement.</p>;
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3" role="radiogroup" aria-label="Choisissez votre mode de livraison">
       {options.map((option) => {
         const selected = option.id === value;
+        const Icon = option.requiresServicePoint ? MapPin : Home;
         return (
           <button
             key={option.id}
             type="button"
+            role="radio"
+            aria-checked={selected}
             onClick={() => onChange(option)}
-            className={`w-full flex items-center gap-3 border px-4 py-3 text-left transition-colors ${
-              selected ? "border-[#222222]" : "border-[#e0e0e0] hover:border-[#999999]"
-            }`}
+            className={"w-full flex items-center gap-3 border p-4 sm:p-5 text-left transition-colors " +
+              (selected ? "border-[#222222] bg-[#f8f8f8]" : "border-[#e5e5e5] bg-white hover:border-[#888888]")}
           >
-            <span
-              className={`w-3.5 h-3.5 border flex-shrink-0 ${
-                selected ? "border-[#222222] bg-[#222222]" : "border-[#999999]"
-              }`}
-            />
-            <Truck size={16} className="text-[#999999] flex-shrink-0" />
+            <span aria-hidden="true"
+              className={"w-5 h-5 border rounded-full flex items-center justify-center shrink-0 " +
+                (selected ? "border-[#222222] bg-[#222222] text-white" : "border-[#c3c3c3]")}>
+              {selected && <Check size={12} />}
+            </span>
+            <Icon size={20} className="text-[#666666] shrink-0" />
             <span className="flex-1 min-w-0">
-              <span className="block text-[0.8125rem] text-[#222222]">{option.name}</span>
-              <span className="block text-[0.6875rem] text-[#999999] uppercase tracking-[1px]">
-                {carrierLabel(option.carrier)}
-                {option.estimatedDays ? ` · ${option.estimatedDays}` : ""}
-                {option.requiresServicePoint ? " · Point relais" : ""}
+              <span className="block text-[0.875rem] text-[#222222] font-medium">{option.name}</span>
+              <span className="block mt-1 text-[0.75rem] text-[#777777]">
+                {option.requiresServicePoint ? "Retrait dans un commerce partenaire" : "Livraison a l'adresse renseignee"}
+              </span>
+              <span className="flex flex-wrap items-center gap-1.5 mt-1 text-[0.6875rem] text-[#888888]">
+                <Truck size={12} /> {carrierLabel(option.carrier)}
+                {option.estimatedDays && <span> · {option.estimatedDays}</span>}
               </span>
             </span>
-            <span className="text-[0.8125rem] whitespace-nowrap">
+            <span className="shrink-0 text-right">
               {isFree ? (
                 <>
-                  <span className="text-[#999999] line-through mr-2">
-                    €{option.price.toFixed(2)}
-                  </span>
-                  <span className="text-[#222222]">Offerte</span>
+                  <span className="block text-[0.6875rem] text-[#999999] line-through">{euro(option.price)}</span>
+                  <span className="block text-[0.8125rem] text-green-700 font-medium">Offerte</span>
                 </>
               ) : (
-                <span className="text-[#222222]">€{option.price.toFixed(2)}</span>
+                <span className="block text-[0.8125rem] font-medium">{euro(option.price)}</span>
               )}
             </span>
           </button>
