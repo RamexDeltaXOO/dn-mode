@@ -106,7 +106,7 @@ export default function AdminCampaigns() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-light text-[#222222]">Campagnes Email</h1>
         <div className="flex items-center gap-3">
           {sentMsg && <span className="text-[0.8125rem] text-green-600 flex items-center gap-1"><Check size={14} />{sentMsg}</span>}
@@ -117,7 +117,7 @@ export default function AdminCampaigns() {
       {/* Create Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-[300] flex items-center justify-center p-4 overflow-auto">
-          <div className="bg-white w-full max-w-[700px] max-h-[90vh] overflow-auto">
+          <div className="bg-white w-full max-w-[700px] max-h-[90dvh] overflow-auto">
             <div className="p-5 border-b border-[#f0f0f0] flex items-center justify-between">
               <h3 className="text-[0.875rem] font-medium">Nouvelle campagne</h3>
               <button onClick={() => setShowForm(false)}><X size={18} /></button>
@@ -136,7 +136,7 @@ export default function AdminCampaigns() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[0.625rem] uppercase tracking-[1px] text-[#999999] block mb-1">Nom *</label>
                   <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} required
@@ -155,7 +155,7 @@ export default function AdminCampaigns() {
                   className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.75rem] outline-none focus:border-[#222222] resize-none font-mono" />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[0.625rem] uppercase tracking-[1px] text-[#999999] block mb-1">Image URL</label>
                   <input value={form.imageUrl} onChange={e => setForm({...form, imageUrl: e.target.value})}
@@ -189,7 +189,7 @@ export default function AdminCampaigns() {
       {/* Preview Modal */}
       {previewId && previewCampaign && (
         <div className="fixed inset-0 bg-black/40 z-[300] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-[600px] max-h-[90vh] overflow-auto">
+          <div className="bg-white w-full max-w-[600px] max-h-[90dvh] overflow-auto">
             <div className="p-4 border-b border-[#f0f0f0] flex items-center justify-between">
               <h3 className="text-[0.875rem] font-medium">{previewCampaign.name}</h3>
               <button onClick={() => setPreviewId(null)}><X size={16} /></button>
@@ -200,8 +200,12 @@ export default function AdminCampaigns() {
       )}
 
       {/* Campaigns List */}
-      <div className="bg-white shadow-sm border border-[#e8e8e8] overflow-x-auto">
-        <table className="w-full text-left">
+      <p className="mb-2 text-[0.75rem] text-[#777777] sm:hidden">
+        Faites defiler le tableau vers la droite pour toutes les actions.
+      </p>
+      <div className="max-w-full bg-white shadow-sm border border-[#e8e8e8] overflow-x-auto overscroll-x-contain"
+        role="region" tabIndex={0} aria-label="Tableau administrateur defilant horizontalement">
+        <table className="w-full min-w-[850px] text-left">
           <thead><tr className="border-b border-[#f0f0f0]">
             <SelectAllCell selection={selection} />
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Nom</th>

@@ -82,7 +82,7 @@ export default function AdminReviews() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-light text-[#222222]">Avis clients</h1>
         <button
           onClick={openCreate}
@@ -97,7 +97,7 @@ export default function AdminReviews() {
 
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-[300] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-[500px] max-h-[90vh] overflow-auto">
+          <div className="bg-white w-full max-w-[500px] max-h-[90dvh] overflow-auto">
             <div className="p-5 border-b border-[#f0f0f0] flex items-center justify-between">
               <h2 className="text-[0.875rem] font-medium">{editingId ? "Modifier" : "Ajouter"} un avis</h2>
               <button onClick={close}><X size={18} /></button>
@@ -115,7 +115,7 @@ export default function AdminReviews() {
                   className={`${inputClass} resize-none`}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelClass}>Nom *</label>
                   <input
@@ -136,7 +136,7 @@ export default function AdminReviews() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelClass}>Note</label>
                   <div className="flex gap-1 py-1.5">
@@ -184,8 +184,12 @@ export default function AdminReviews() {
         </div>
       )}
 
-      <div className="bg-white shadow-sm border border-[#e8e8e8] overflow-x-auto">
-        <table className="w-full text-left">
+      <p className="mb-2 text-[0.75rem] text-[#777777] sm:hidden">
+        Faites defiler le tableau vers la droite pour toutes les actions.
+      </p>
+      <div className="max-w-full bg-white shadow-sm border border-[#e8e8e8] overflow-x-auto overscroll-x-contain"
+        role="region" tabIndex={0} aria-label="Tableau administrateur defilant horizontalement">
+        <table className="w-full min-w-[740px] text-left">
           <thead>
             <tr className="border-b border-[#f0f0f0]">
               <SelectAllCell selection={selection} />

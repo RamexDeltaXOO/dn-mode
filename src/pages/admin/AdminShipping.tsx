@@ -136,14 +136,14 @@ export default function AdminShipping() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-light text-[#222222]">Methodes de Livraison</h1>
         <button onClick={openCreate} className="flex items-center gap-2 bg-[#222222] text-white px-4 py-2 text-[0.75rem] uppercase tracking-[1.5px]"><Plus size={14} /> Ajouter</button>
       </div>
 
       {/* Sendcloud */}
       <div className="bg-white border border-[#e8e8e8] p-5 mb-6">
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex flex-wrap items-center gap-2 mb-3">
           <Truck size={16} className="text-[#999999]" />
           <h2 className="text-[0.875rem] font-medium">Sendcloud</h2>
           <span
@@ -156,7 +156,7 @@ export default function AdminShipping() {
           <button
             onClick={() => syncMethods.mutate()}
             disabled={syncMethods.isPending}
-            className="ml-auto flex items-center gap-2 border border-[#e0e0e0] px-3 py-1.5 text-[0.625rem] uppercase tracking-[1px] hover:border-[#222222] disabled:opacity-50"
+            className="w-full sm:w-auto sm:ml-auto flex items-center justify-center gap-2 border border-[#e0e0e0] px-3 py-2 text-[0.625rem] uppercase tracking-[1px] hover:border-[#222222] disabled:opacity-50"
           >
             <RefreshCw size={12} className={syncMethods.isPending ? "animate-spin" : ""} />
             Synchroniser depuis Sendcloud
@@ -188,6 +188,14 @@ export default function AdminShipping() {
             etiquettes et les vrais points relais.
           </p>
         )}
+        <p className="mt-3 text-[0.75rem] leading-relaxed text-[#777777]">
+          Pour creer une etiquette, Sendcloud exige aussi un moyen de paiement actif dans les reglages
+          de facturation de votre compte.{" "}
+          <a href="https://panel.sendcloud.sc/" target="_blank" rel="noopener noreferrer"
+            className="font-medium text-[#222222] underline underline-offset-2">
+            Verifier la facturation Sendcloud
+          </a>
+        </p>
       </div>
 
       {/* Info cards */}
@@ -207,7 +215,7 @@ export default function AdminShipping() {
 
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-[300] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <div className="bg-white w-full max-w-[500px] max-h-[90dvh] overflow-y-auto">
             <div className="p-5 border-b border-[#f0f0f0] flex items-center justify-between">
               <h2 className="text-[0.875rem] font-medium">{editingId ? "Modifier" : "Ajouter"} une methode</h2>
               <button onClick={() => setShowForm(false)}><X size={18} /></button>
@@ -225,7 +233,7 @@ export default function AdminShipping() {
                   {carriers.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {form.rates.length === 0 && (
                   <div>
                     <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Prix unique (EUR) *</label>
@@ -322,8 +330,12 @@ export default function AdminShipping() {
         </div>
       )}
 
-      <div className="bg-white shadow-sm border border-[#e8e8e8] overflow-x-auto">
-        <table className="w-full text-left">
+      <p className="mb-2 text-[0.75rem] text-[#777777] sm:hidden">
+        Faites defiler le tableau horizontalement pour voir toutes les options.
+      </p>
+      <div className="max-w-full bg-white shadow-sm border border-[#e8e8e8] overflow-x-auto overscroll-x-contain"
+        role="region" tabIndex={0} aria-label="Methodes de livraison, tableau defilant">
+        <table className="w-full min-w-[800px] text-left">
           <thead><tr className="border-b border-[#f0f0f0]">
             <SelectAllCell selection={selection} />
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Nom</th>

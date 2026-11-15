@@ -39,7 +39,7 @@ export default function AdminCollections() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-light text-[#222222]">Collections</h1>
         <button onClick={openCreate} className="flex items-center gap-2 bg-[#222222] text-white px-4 py-2 text-[0.75rem] uppercase tracking-[1.5px]"><Plus size={14} /> Ajouter</button>
       </div>
@@ -49,7 +49,7 @@ export default function AdminCollections() {
 
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-[300] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-[500px]">
+          <div className="bg-white w-full max-w-[500px] max-h-[90dvh] overflow-y-auto">
             <div className="p-5 border-b border-[#f0f0f0] flex items-center justify-between">
               <h2 className="text-[0.875rem] font-medium">{editingId ? "Modifier" : "Ajouter"} une collection</h2>
               <button onClick={() => setShowForm(false)}><X size={18} /></button>
@@ -58,7 +58,7 @@ export default function AdminCollections() {
               <div><label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Nom *</label><input value={form.name} onChange={e => setForm({...form, name: e.target.value})} required className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222]" /></div>
               <div><label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Slug</label><input value={form.slug} onChange={e => setForm({...form, slug: e.target.value})} onBlur={() => setForm(current => ({ ...current, slug: slugify(current.slug) }))} placeholder={slugify(form.name) || "auto-genere"} className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222]" /></div>
               <div><label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Description</label><textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} rows={2} className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222] resize-none" /></div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div><label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Image URL</label><input value={form.image} onChange={e => setForm({...form, image: e.target.value})} className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222]" /></div>
                 <div><label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Ordre</label><input type="number" value={form.sortOrder} onChange={e => setForm({...form, sortOrder: e.target.value})} className="w-full border border-[#e0e0e0] px-3 py-2 text-[0.875rem] outline-none focus:border-[#222222]" /></div>
               </div>
@@ -68,8 +68,12 @@ export default function AdminCollections() {
         </div>
       )}
 
-      <div className="bg-white shadow-sm border border-[#e8e8e8] overflow-x-auto">
-        <table className="w-full text-left">
+      <p className="mb-2 text-[0.75rem] text-[#777777] sm:hidden">
+        Faites defiler le tableau vers la droite pour toutes les actions.
+      </p>
+      <div className="max-w-full bg-white shadow-sm border border-[#e8e8e8] overflow-x-auto overscroll-x-contain"
+        role="region" tabIndex={0} aria-label="Tableau administrateur defilant horizontalement">
+        <table className="w-full min-w-[650px] text-left">
           <thead><tr className="border-b border-[#f0f0f0]">
             <SelectAllCell selection={selection} />
             <th className="px-4 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Nom</th>

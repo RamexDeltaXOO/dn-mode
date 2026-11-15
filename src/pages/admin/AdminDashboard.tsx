@@ -125,8 +125,9 @@ export default function AdminDashboard() {
           <h2 className="text-[0.875rem] font-medium">Commandes recentes</h2>
           <Link to="/admin/orders" className="text-[0.75rem] text-[#999999] hover:text-[#222222] underline">Voir tout</Link>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
+        <div className="max-w-full overflow-x-auto overscroll-x-contain" role="region" tabIndex={0}
+          aria-label="Commandes recentes, tableau defilant">
+          <table className="w-full min-w-[650px] text-left">
             <thead><tr className="border-b border-[#f0f0f0]">
               <th className="px-5 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Commande</th>
               <th className="px-5 py-3 text-[0.6875rem] uppercase tracking-[1px] text-[#999999] font-normal">Client</th>

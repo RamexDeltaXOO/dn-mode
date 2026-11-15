@@ -20,8 +20,8 @@ type FieldProps = {
  */
 function Field({ label, value, onChange, type = "text", placeholder }: FieldProps) {
   return (
-    <div className="flex items-start gap-4">
-      <div className="flex-1">
+    <div className="flex min-w-0 items-start gap-4">
+      <div className="min-w-0 flex-1">
         <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1.5">{label}</label>
         <input
           type={type}
@@ -82,7 +82,7 @@ function SectionHeader({
   badge?: { label: string; ok: boolean };
 }) {
   return (
-    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-[#f0f0f0]">
+    <div className="flex flex-wrap items-center gap-2 mb-4 pb-2 border-b border-[#f0f0f0]">
       <Icon size={16} className="text-[#999999]" />
       <h2 className="text-[0.875rem] font-medium">{title}</h2>
       {badge && (
@@ -258,7 +258,7 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
 
       <div className="space-y-8">
           {/* Site Settings */}
-          <div className="bg-white shadow-sm border border-[#e8e8e8] p-6">
+          <div className="min-w-0 bg-white shadow-sm border border-[#e8e8e8] p-4 sm:p-6">
             <SectionHeader icon={Globe} title="Site Web" />
             <div className="space-y-4">
               <Field label="Nom du site" value={form.site_name} onChange={(v) => setForm({ ...form, site_name: v })} placeholder="DN MODE" />
@@ -271,7 +271,7 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
               </p>
               <Field label="Email de contact" value={form.contact_email} onChange={(v) => setForm({ ...form, contact_email: v })} placeholder="contact@dn-mode.com" />
               <Field label="URL Instagram" value={form.instagram_url} onChange={(v) => setForm({ ...form, instagram_url: v })} placeholder="https://instagram.com/..." />
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Field label="Seuil livraison offerte (€)" value={form.shipping_threshold} onChange={(v) => setForm({ ...form, shipping_threshold: v })} placeholder="100" />
                 <Field label="Frais de livraison" value={form.shipping_cost} onChange={(v) => setForm({ ...form, shipping_cost: v })} placeholder="5.90" />
                 <Field label="Devise" value={form.currency} onChange={(v) => setForm({ ...form, currency: v })} placeholder="EUR" />
@@ -283,7 +283,7 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
           </div>
 
           {/* Page d'accueil */}
-          <div className="bg-white shadow-sm border border-[#e8e8e8] p-6">
+          <div className="min-w-0 bg-white shadow-sm border border-[#e8e8e8] p-4 sm:p-6">
             <SectionHeader icon={LayoutTemplate} title="Page d'accueil" />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <SingleImageUploader
@@ -328,7 +328,7 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
           </div>
 
           {/* Textes du site */}
-          <div className="bg-white shadow-sm border border-[#e8e8e8] p-6">
+          <div className="min-w-0 bg-white shadow-sm border border-[#e8e8e8] p-4 sm:p-6">
             <SectionHeader icon={Type} title="Textes du site" />
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -391,7 +391,7 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
           />
 
           {/* Stripe Settings */}
-          <div className="bg-white shadow-sm border border-[#e8e8e8] p-6">
+          <div className="min-w-0 bg-white shadow-sm border border-[#e8e8e8] p-4 sm:p-6">
             <SectionHeader icon={CreditCard} title="Paiement Stripe" />
             <div className="space-y-4">
               <Field label="Stripe Publishable Key (pk_...)" value={form.stripe_publishable_key} onChange={(v) => setForm({ ...form, stripe_publishable_key: v })} placeholder="pk_test_..." />
@@ -438,19 +438,19 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
           </div>
 
           {/* Sendcloud Settings */}
-          <div className="bg-white shadow-sm border border-[#e8e8e8] p-6">
+          <div className="min-w-0 bg-white shadow-sm border border-[#e8e8e8] p-4 sm:p-6">
             <SectionHeader
               icon={Truck}
               title="Livraison Sendcloud"
               badge={{
-                label: sendcloudStatus?.configured ? "Connecte" : "Mode demo",
+                label: sendcloudStatus?.configured ? "Cles configurees" : "Non configure",
                 ok: Boolean(sendcloudStatus?.configured),
               }}
             />
             <div className="space-y-4">
               <Field label="Sendcloud Public Key" value={form.sendcloud_public_key} onChange={(v) => setForm({ ...form, sendcloud_public_key: v })} placeholder="Cle publique API" />
               <Field label="Sendcloud Secret Key" value={form.sendcloud_secret_key} onChange={(v) => setForm({ ...form, sendcloud_secret_key: v })} type="password" placeholder="Cle secrete API" />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="ID adresse d'expedition" value={form.sendcloud_sender_address_id} onChange={(v) => setForm({ ...form, sendcloud_sender_address_id: v })} placeholder="123456" />
                 <Field label="Poids par defaut (kg)" value={form.sendcloud_default_weight} onChange={(v) => setForm({ ...form, sendcloud_default_weight: v })} placeholder="1" />
               </div>
@@ -479,15 +479,29 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
                   {testSendcloud.data.message}
                 </p>
               )}
+              <div className="border border-[#e8e8e8] bg-[#fafafa] p-3 text-[0.75rem] leading-relaxed text-[#666666]">
+                <p className="font-medium text-[#222222]">Facturation Sendcloud</p>
+                <p className="mt-1">
+                  Des cles API valides ne garantissent pas la creation d'etiquettes.
+                  Votre compte Sendcloud doit aussi disposer d'un moyen de paiement actif.
+                  Si l'erreur « User has no valid payment method » apparait, mettez a jour
+                  le paiement dans Mon compte &gt; Facturation.
+                </p>
+                <a href="https://panel.sendcloud.sc/" target="_blank" rel="noopener noreferrer"
+                  className="mt-2 inline-block font-medium text-[#222222] underline underline-offset-2">
+                  Ouvrir Sendcloud (facturation)
+                </a>
+              </div>
               <p className="text-[0.6875rem] text-[#999999]">
                 Colissimo, Chronopost et Mondial Relay passent par Sendcloud. Sans cles, la boutique
-                fonctionne en mode demo (methodes et points relais fictifs).
+                affiche les options de demonstration dans le CRM, mais ne peut pas creer de
+                vraies etiquettes ni proposer de points relais reels au checkout.
               </p>
             </div>
           </div>
 
           {/* Stockage des images */}
-          <div className="bg-white shadow-sm border border-[#e8e8e8] p-6">
+          <div className="min-w-0 bg-white shadow-sm border border-[#e8e8e8] p-4 sm:p-6">
             <SectionHeader
               icon={Image}
               title="Stockage des images"
@@ -498,7 +512,7 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
             />
             <div className="space-y-4">
               <Field label="Endpoint S3" value={form.storage_endpoint} onChange={(v) => setForm({ ...form, storage_endpoint: v })} placeholder="https://storage.googleapis.com" />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Bucket" value={form.storage_bucket} onChange={(v) => setForm({ ...form, storage_bucket: v })} placeholder="dnmode-images" />
                 <Field label="Region" value={form.storage_region} onChange={(v) => setForm({ ...form, storage_region: v })} placeholder="auto" />
               </div>
@@ -516,7 +530,7 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
           </div>
 
           {/* Emails transactionnels */}
-          <div className="bg-white shadow-sm border border-[#e8e8e8] p-6">
+          <div className="min-w-0 bg-white shadow-sm border border-[#e8e8e8] p-4 sm:p-6">
             <SectionHeader
               icon={Mail}
               title="Emails transactionnels"
@@ -527,7 +541,7 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
             />
             <div className="space-y-4">
               <Field label="Resend API Key" value={form.resend_api_key} onChange={(v) => setForm({ ...form, resend_api_key: v })} type="password" placeholder="re_..." />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Email expediteur" value={form.from_email} onChange={(v) => setForm({ ...form, from_email: v })} placeholder="DN MODE <contact@dn-mode.com>" />
                 <Field label="Email SAV" value={form.support_email} onChange={(v) => setForm({ ...form, support_email: v })} placeholder="sav@dn-mode.com" />
               </div>
@@ -556,7 +570,7 @@ function SettingsForm({ configs }: { configs: ConfigRow[] }) {
           </div>
 
           {/* Gmail OAuth Settings */}
-          <div className="bg-white shadow-sm border border-[#e8e8e8] p-6">
+          <div className="min-w-0 bg-white shadow-sm border border-[#e8e8e8] p-4 sm:p-6">
             <SectionHeader icon={Mail} title="Connexion Gmail (Google OAuth)" />
             <div className="space-y-4">
               <Field label="Google Client ID" value={form.gmail_client_id} onChange={(v) => setForm({ ...form, gmail_client_id: v })} placeholder="xxx.apps.googleusercontent.com" />

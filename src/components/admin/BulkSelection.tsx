@@ -79,7 +79,7 @@ export function BulkActionBar({
       {/* Reserve la place de la barre sous le tableau : la derniere ligne reste visible. */}
       <div aria-hidden className="h-20" />
       {/* Barre flottante : le tableau ne bouge pas quand on coche, pas de clic qui tombe a cote. */}
-      <div className="fixed bottom-6 left-[calc(250px+1.5rem)] right-6 sm:left-[calc(250px+2rem)] sm:right-8 z-[50] flex flex-wrap items-center gap-x-4 gap-y-2 bg-[#222222] text-white px-4 py-3 shadow-lg">
+      <div className="fixed bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-6 lg:left-[calc(250px+2rem)] lg:right-8 z-[40] flex flex-wrap items-center gap-x-4 gap-y-2 bg-[#222222] text-white px-4 py-3 shadow-lg">
         <span className="text-[0.8125rem]">
           {count} {noun} selectionne(s)
         </span>

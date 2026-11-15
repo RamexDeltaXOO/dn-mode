@@ -2,7 +2,7 @@ import { Fragment, useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { useBulkSelection } from "@/hooks/useBulkSelection";
 import { BulkActionBar, SelectAllCell, SelectCell } from "@/components/admin/BulkSelection";
-import { ChevronDown, Package, MapPin, ExternalLink, FileDown, Trash2 } from "lucide-react";
+import { ChevronDown, Package, MapPin, ExternalLink, FileDown, Trash2, MoveHorizontal, CreditCard } from "lucide-react";
 import { carrierLabel } from "@contracts/constants";
 
 const statusColors: Record<string, string> = {
@@ -48,7 +48,8 @@ export default function AdminOrders() {
   });
 
   const createLabel = trpc.sendcloud.createLabel.useMutation({
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (!result.ok) return;
       utils.order.list.invalidate();
       utils.order.getById.invalidate();
     },
@@ -89,7 +90,7 @@ export default function AdminOrders() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-light text-[#222222]">Commandes</h1>
         {feedback && <span className="text-[0.8125rem] text-green-700">{feedback}</span>}
       </div>
@@ -108,9 +109,13 @@ export default function AdminOrders() {
         </select>
       </div>
 
-      {/* Orders Table */}
-      <div className="bg-white shadow-sm border border-[#e8e8e8] overflow-x-auto">
-        <table className="w-full text-left">
+      {/* Les colonnes restent accessibles par defilement sur telephone. */}
+      <p className="mb-2 flex items-center gap-2 text-[0.75rem] text-[#777777] sm:hidden">
+        <MoveHorizontal size={16} aria-hidden="true" /> Faites defiler le tableau pour voir les actions
+      </p>
+      <div className="max-w-full bg-white shadow-sm border border-[#e8e8e8] overflow-x-auto overscroll-x-contain"
+        role="region" tabIndex={0} aria-label="Liste des commandes, defilement horizontal">
+        <table className="w-full min-w-[850px] text-left">
           <thead>
             <tr className="border-b border-[#f0f0f0]">
               <SelectAllCell selection={selection} />
@@ -261,7 +266,7 @@ export default function AdminOrders() {
                               <button
                                 onClick={() => createLabel.mutate({ orderId: orderDetail.id })}
                                 disabled={createLabel.isPending || !!orderDetail.sendcloudParcelId}
-                                className="text-[0.625rem] uppercase tracking-[1px] bg-[#222222] text-white px-3 py-1.5 hover:bg-[#333333] disabled:opacity-40"
+                                className="min-h-9 text-[0.6875rem] uppercase tracking-[1px] bg-[#222222] text-white px-3 py-2 hover:bg-[#333333] disabled:opacity-40"
                               >
                                 {orderDetail.sendcloudParcelId
                                   ? "Etiquette deja generee"
@@ -281,17 +286,40 @@ export default function AdminOrders() {
                               )}
                             </div>
 
-                            {labelPdf.data && !labelPdf.data.ok && (
-                              <p className="text-[0.6875rem] mt-2 text-red-600">{labelPdf.data.message}</p>
+                            {labelPdf.variables?.orderId === orderDetail.id && labelPdf.data && !labelPdf.data.ok && (
+                              <p role="alert" className="text-[0.75rem] mt-2 text-red-600">{labelPdf.data.message}</p>
+                            )}
+                            {labelPdf.variables?.orderId === orderDetail.id && labelPdf.error && (
+                              <p role="alert" className="text-[0.75rem] mt-2 text-red-600">
+                                Echec du telechargement : {labelPdf.error.message}
+                              </p>
                             )}
 
-                            {createLabel.data && (
-                              <p
-                                className={`text-[0.6875rem] mt-2 ${
-                                  createLabel.data.ok ? "text-green-700" : "text-red-600"
-                                }`}
-                              >
-                                {createLabel.data.message}
+                            {createLabel.variables?.orderId === orderDetail.id && createLabel.data && (
+                              createLabel.data.billingIssue ? (
+                                <div role="alert" className="mt-3 border border-amber-300 bg-amber-50 p-4 text-[0.8125rem] leading-relaxed text-amber-950">
+                                  <p className="flex items-center gap-2 font-medium">
+                                    <CreditCard size={17} aria-hidden="true" /> Facturation Sendcloud a completer
+                                  </p>
+                                  <p className="mt-2">{createLabel.data.message}</p>
+                                  <a href="https://panel.sendcloud.sc/" target="_blank" rel="noopener noreferrer"
+                                    className="mt-3 inline-flex min-h-9 items-center gap-2 border border-amber-800 px-3 py-2 font-medium hover:bg-amber-100">
+                                    Ouvrir Sendcloud <ExternalLink size={14} aria-hidden="true" />
+                                  </a>
+                                  <p className="mt-2 text-[0.75rem]">
+                                    Aucune etiquette n'a ete creee. Reglez la facturation dans Sendcloud, puis relancez la creation ici.
+                                  </p>
+                                </div>
+                              ) : (
+                                <p role={createLabel.data.ok ? "status" : "alert"}
+                                  className={`text-[0.75rem] mt-2 ${createLabel.data.ok ? "text-green-700" : "text-red-600"}`}>
+                                  {createLabel.data.message}
+                                </p>
+                              )
+                            )}
+                            {createLabel.variables?.orderId === orderDetail.id && createLabel.error && (
+                              <p role="alert" className="mt-2 text-[0.75rem] text-red-600">
+                                La creation de l'etiquette a echoue : {createLabel.error.message}
                               </p>
                             )}
                           </div>

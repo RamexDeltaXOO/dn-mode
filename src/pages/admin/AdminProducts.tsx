@@ -165,7 +165,7 @@ export default function AdminProducts() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-light text-[#222222]">Produits</h1>
         <button
           onClick={openCreate}
@@ -196,7 +196,7 @@ export default function AdminProducts() {
       {/* Product Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-[300] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-[600px] max-h-[90vh] overflow-auto">
+          <div className="bg-white w-full max-w-[600px] max-h-[90dvh] overflow-auto">
             <div className="p-5 border-b border-[#f0f0f0] flex items-center justify-between">
               <h2 className="text-[0.875rem] font-medium">
                 {editingId ? "Modifier" : "Ajouter"} un produit
@@ -206,7 +206,7 @@ export default function AdminProducts() {
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Nom *</label>
                   <input
@@ -228,7 +228,7 @@ export default function AdminProducts() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Prix (€) *</label>
                   <input
@@ -301,7 +301,7 @@ export default function AdminProducts() {
                 value={form.images}
                 onChange={(images) => setForm({ ...form, images })}
               />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Couleurs</label>
                   <input
@@ -370,7 +370,7 @@ export default function AdminProducts() {
                   </p>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[0.6875rem] uppercase tracking-[1px] text-[#999999] block mb-1">Collection</label>
                   <select
@@ -429,8 +429,12 @@ export default function AdminProducts() {
       )}
 
       {/* Products Table */}
-      <div className="bg-white shadow-sm border border-[#e8e8e8] overflow-x-auto">
-        <table className="w-full text-left">
+      <p className="mb-2 text-[0.75rem] text-[#777777] sm:hidden">
+        Faites defiler horizontalement pour consulter et gerer les produits.
+      </p>
+      <div className="max-w-full bg-white shadow-sm border border-[#e8e8e8] overflow-x-auto overscroll-x-contain"
+        role="region" tabIndex={0} aria-label="Liste des produits, tableau defilant">
+        <table className="w-full min-w-[790px] text-left">
           <thead>
             <tr className="border-b border-[#f0f0f0]">
               <SelectAllCell selection={selection} />

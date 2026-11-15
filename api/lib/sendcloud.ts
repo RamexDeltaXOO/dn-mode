@@ -45,6 +45,8 @@ export type ParcelResult = {
   trackingNumber: string | null;
   trackingUrl: string | null;
   labelUrl: string | null;
+  /** Le refus de l'etiquette provient de la facturation Sendcloud. */
+  billingIssue?: boolean;
 };
 
 export type SendcloudCredentials = {
@@ -166,8 +168,24 @@ function formatV3Error(raw: unknown): string {
   return pointer ? `${pointer} : ${detail}` : detail;
 }
 
+/** Refus de facturation renvoye par Sendcloud, parfois dans errors[], parfois en HTTP. */
+export function isSendcloudBillingError(message: string): boolean {
+  return /no valid payment method|add a valid payment method|payment method.{0,50}billing settings|moyen de paiement.{0,60}(invalide|valide|manquant)/i.test(message);
+}
+
 export function parcelFailure(message: string): ParcelResult {
-  return { ok: false, message, parcelId: null, trackingNumber: null, trackingUrl: null, labelUrl: null };
+  const billingIssue = isSendcloudBillingError(message);
+  return {
+    ok: false,
+    message: billingIssue
+      ? "Sendcloud a refuse l'etiquette : aucun moyen de paiement valide n'est configure sur votre compte. Ajoutez ou actualisez votre moyen de paiement dans Sendcloud > Mon compte > Facturation, puis reessayez."
+      : message,
+    parcelId: null,
+    trackingNumber: null,
+    trackingUrl: null,
+    labelUrl: null,
+    billingIssue,
+  };
 }
 
 // ── Utilitaires ─────────────────────────────────────────────
@@ -731,9 +749,12 @@ export function readShipmentResult(raw: RawShipment | null | undefined): ParcelR
   const failed =
     !parcel || status === "ANNOUNCEMENT_FAILED" || (errors.length > 0 && !parcel.tracking_number);
   if (failed) {
+    // Une reponse HTTP 201 peut contenir un colis refuse et un message de
+    // facturation dans status.message, sans entree dans errors[].
+    const reason = errors.join(" ; ") || String(parcel?.status?.message ?? "").trim();
     return parcelFailure(
-      errors.length > 0
-        ? `Sendcloud a refuse le colis : ${errors.join(" ; ")}`
+      reason
+        ? `Sendcloud a refuse le colis : ${reason}`
         : "Sendcloud n'a pas pu annoncer le colis au transporteur.",
     );
   }
